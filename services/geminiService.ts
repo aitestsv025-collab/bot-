@@ -3,18 +3,21 @@ import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
 import { BotConfig, Role, Message } from "../types";
 
 export class GeminiBotService {
-  private ai: GoogleGenAI;
+  private ai: GoogleGenAI | null = null;
   private chat: Chat | null = null;
 
   constructor() {
     const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      throw new Error("API_KEY not found in environment variables.");
+    if (apiKey && apiKey !== "undefined") {
+      this.ai = new GoogleGenAI({ apiKey });
+    } else {
+      console.warn("API_KEY not found. Simulation will show error messages.");
     }
-    this.ai = new GoogleGenAI({ apiKey });
   }
 
   public initChat(config: BotConfig, history: Message[] = []) {
+    if (!this.ai) return;
+
     const systemInstruction = `
       You are an AI character acting as the user's girlfriend.
       Your name is ${config.name}.
@@ -41,6 +44,9 @@ export class GeminiBotService {
   }
 
   public async sendMessage(text: string): Promise<string> {
+    if (!this.ai) {
+      return "⚠️ Error: Google API Key missing! Please add 'API_KEY' in Render Environment Variables.";
+    }
     if (!this.chat) {
       throw new Error("Chat not initialized. Call initChat first.");
     }
@@ -48,8 +54,11 @@ export class GeminiBotService {
     try {
       const result: GenerateContentResponse = await this.chat.sendMessage({ message: text });
       return result.text || "I'm not sure what to say, love... could you repeat that?";
-    } catch (error) {
+    } catch (error: any) {
       console.error("Gemini API Error:", error);
+      if (error.message?.includes("API_KEY_INVALID")) {
+        return "⚠️ Your Google API Key seems to be invalid. Please check it in Google AI Studio.";
+      }
       return "Something went wrong with our connection. Let's try again?";
     }
   }
