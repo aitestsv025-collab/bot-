@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatUI from './components/ChatUI';
 import { Message, BotConfig, DEFAULT_CONFIG, Role } from './types';
@@ -11,7 +11,6 @@ const App: React.FC = () => {
   const [isTyping, setIsTyping] = useState(false);
   const botServiceRef = useRef<GeminiBotService | null>(null);
 
-  // Initialize bot service on mount
   useEffect(() => {
     try {
       botServiceRef.current = new GeminiBotService();
@@ -21,7 +20,6 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Sync personality changes to the engine
   const handleConfigChange = (newConfig: BotConfig) => {
     setConfig(newConfig);
     if (botServiceRef.current) {
@@ -61,43 +59,67 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row h-screen bg-rose-50">
-      {/* Sidebar for Config */}
+    <div className="flex flex-col lg:flex-row h-screen bg-[#fffafa]">
       <Sidebar 
         config={config} 
         onConfigChange={handleConfigChange} 
         onReset={handleReset} 
       />
 
-      {/* Main Chat Area */}
-      <main className="flex-1 p-4 lg:p-10 flex flex-col items-center justify-center overflow-hidden">
-        <div className="w-full max-w-4xl h-full flex flex-col">
-          <div className="mb-4 flex flex-wrap gap-4 items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="bg-green-100 text-green-600 px-3 py-1 rounded-full text-xs font-bold border border-green-200 uppercase tracking-tighter">
-                Gemini 3 Pro Active
+      <main className="flex-1 p-4 lg:p-8 flex flex-col overflow-hidden">
+        {/* Status Bar */}
+        <div className="max-w-4xl w-full mx-auto mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="px-3 py-1.5 bg-white border border-rose-100 rounded-full flex items-center gap-2 shadow-sm">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
               </span>
-              {config.telegramToken && (
-                <span className="bg-sky-100 text-sky-600 px-3 py-1 rounded-full text-xs font-bold border border-sky-200 uppercase tracking-tighter flex items-center gap-1">
-                  <i className="fa-brands fa-telegram"></i> Bot Linked
-                </span>
-              )}
+              <span className="text-[11px] font-bold text-gray-600 uppercase">Simulator Live</span>
             </div>
-            <div className="text-xs text-rose-400 font-medium">
-              Simulation Mode
-            </div>
+            
+            {config.telegramToken ? (
+              <div className="px-3 py-1.5 bg-sky-500 text-white rounded-full flex items-center gap-2 shadow-md">
+                <i className="fa-brands fa-telegram text-xs"></i>
+                <span className="text-[11px] font-bold uppercase">Bot Linked</span>
+              </div>
+            ) : (
+              <div className="px-3 py-1.5 bg-gray-100 text-gray-400 rounded-full flex items-center gap-2">
+                <i className="fa-brands fa-telegram text-xs opacity-50"></i>
+                <span className="text-[11px] font-bold uppercase">No Telegram Token</span>
+              </div>
+            )}
           </div>
           
+          <div className="hidden sm:block">
+             <p className="text-[11px] text-rose-400 font-bold tracking-widest uppercase">
+               Personality: <span className="text-gray-600">{config.mood}</span>
+             </p>
+          </div>
+        </div>
+
+        {/* Chat Component */}
+        <div className="flex-1 max-w-4xl w-full mx-auto overflow-hidden">
           <ChatUI 
             messages={messages} 
             onSendMessage={handleSendMessage} 
             isTyping={isTyping} 
             botName={config.name}
           />
+        </div>
 
-          <div className="mt-4 text-[11px] text-gray-400 text-center leading-relaxed italic">
-            "Testing the personality before deploying to Telegram. All chat history is local to your browser session."
-          </div>
+        {/* Footer Info */}
+        <div className="max-w-4xl w-full mx-auto mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+           <div className="flex items-center gap-2 text-rose-300">
+             <i className="fas fa-shield-heart"></i>
+             <span className="text-[11px] font-medium tracking-wide">End-to-End Simulation Mode</span>
+           </div>
+           <button 
+             onClick={() => window.open('https://render.com/docs/environment-variables', '_blank')}
+             className="text-[11px] text-sky-500 hover:text-sky-600 font-bold underline transition-colors"
+           >
+             View Deployment Instructions for Telegram
+           </button>
         </div>
       </main>
     </div>
