@@ -6,7 +6,8 @@ export default defineConfig({
   plugins: [react()],
   define: {
     'process.env.API_KEY': JSON.stringify(process.env.API_KEY),
-    'process.env.TELEGRAM_BOT_TOKEN': JSON.stringify(process.env.TELEGRAM_BOT_TOKEN)
+    'process.env.TELEGRAM_BOT_TOKEN': JSON.stringify(process.env.TELEGRAM_BOT_TOKEN),
+    'process.env.HF_TOKEN': JSON.stringify(process.env.HF_TOKEN)
   },
   build: {
     outDir: 'dist',
