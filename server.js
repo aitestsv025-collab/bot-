@@ -15,7 +15,7 @@ const BOT_NAME = process.env.BOT_NAME || "Malini";
 
 const userSessions = new Map();
 
-console.log(`--- ❤️ Malini Bot v8.0 (Step Sister & Tamil Update) ---`);
+console.log(`--- ❤️ Malini Bot v9.0 (Localized Language Response) ---`);
 
 if (BOT_TOKEN && GEMINI_KEY) {
     const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
@@ -45,9 +45,22 @@ if (BOT_TOKEN && GEMINI_KEY) {
 
     bot.action(/lang_(.+)/, (ctx) => {
         const session = userSessions.get(ctx.chat.id);
-        if (session) session.lang = ctx.match[1];
-        const langDisplay = session.lang === 'Tamil' ? 'Tamil' : (session.lang === 'Hindi' ? 'Hindi' : 'Hinglish');
-        return ctx.editMessageText(`Perfect! ❤️ Ab hum sirf ${langDisplay} mein hi baat karenge. Kuch bhi pucho apni ${session?.role || 'Girlfriend'} se...`);
+        const selectedLang = ctx.match[1];
+        if (session) session.lang = selectedLang;
+        
+        const role = session?.role || 'Girlfriend';
+        let confirmationText = "";
+
+        // Send confirmation message in the selected language
+        if (selectedLang === 'Tamil') {
+            confirmationText = `சிறப்பானது! ❤️ இனி நாம் தமிழில் மட்டுமே பேசுவோம். உங்கள் ${role}-இடம் எதையும் கேளுங்கள்...`;
+        } else if (selectedLang === 'Hindi') {
+            confirmationText = `बहुत बढ़िया! ❤️ अब हम सिर्फ हिंदी में ही बात करेंगे। अपनी ${role} से कुछ भी पूछो...`;
+        } else {
+            confirmationText = `Perfect! ❤️ Ab hum sirf Hinglish mein hi baat karenge. Kuch bhi pucho apni ${role} se...`;
+        }
+
+        return ctx.editMessageText(confirmationText);
     });
 
     bot.on('text', async (ctx) => {
