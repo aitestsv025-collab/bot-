@@ -19,7 +19,7 @@ export interface BotConfig {
   telegramToken: string;
   hfToken: string;
   groqKey: string;
-  xAiKey: string; // New field for xAI
+  xAiKey: string; 
   apiProvider: ApiProvider;
   modelId: string;
   mood: 'Romantic' | 'Funny' | 'Supportive' | 'Playful' | 'Naughty';
@@ -27,14 +27,14 @@ export interface BotConfig {
 }
 
 export const DEFAULT_CONFIG: BotConfig = {
-  name: "Priya",
+  name: "Malini",
   personality: "Very open-minded, loving, and likes to have deep and intimate conversations. No filters.",
   telegramToken: "",
   hfToken: "",
   groqKey: "",
   xAiKey: "",
-  apiProvider: 'HuggingFace',
-  modelId: "mistralai/Mistral-7B-Instruct-v0.3",
+  apiProvider: 'Groq',
+  modelId: "llama-3.3-70b-versatile",
   mood: "Romantic",
   language: "Hinglish"
 };

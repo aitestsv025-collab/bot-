@@ -9,14 +9,16 @@ const app = express();
 
 // --- CONFIGURATION ---
 const BOT_TOKEN = (process.env.TELEGRAM_TOKEN || "").trim();
-const GROQ_KEY = (process.env.grok || process.env.GROQ_KEY || "").trim();
-const BOT_NAME = process.env.BOT_NAME || "Priya";
+const XAI_KEY = (process.env.XAI_KEY || "").trim();
+const GROQ_KEY = (process.env.GROK_KEY || process.env.GROQ_KEY || process.env.grok || "").trim();
+const BOT_NAME = process.env.BOT_NAME || "Malini";
 
 // userSessions stores: { role: string, lang: string, history: [] }
 const userSessions = new Map();
 
-console.log("--- ❤️ Multi-Roleplay Bot v4.0 ---");
+console.log(`--- ❤️ Multi-Roleplay Bot: ${BOT_NAME} v4.2 ---`);
 console.log("Bot Token:", BOT_TOKEN ? "✅ Active" : "❌ MISSING");
+console.log("XAI Key:", XAI_KEY ? "✅ Active" : "❌ MISSING");
 console.log("Groq Key:", GROQ_KEY ? "✅ Active" : "❌ MISSING");
 console.log("----------------------------------");
 
@@ -26,7 +28,7 @@ if (BOT_TOKEN) {
     // 1. START COMMAND - Role Selection
     bot.start((ctx) => {
         userSessions.delete(ctx.chat.id); // Reset session
-        return ctx.reply(`Hi! ❤️ Main aapki virtual companion hoon. Aap mujhse kis roop mein baat karna chahte hain? Choose karein:`, 
+        return ctx.reply(`Hi! ❤️ Main aapki ${BOT_NAME} hoon. Aap mujhse kis roop mein baat karna chahte hain? Choose karein:`, 
             Markup.inlineKeyboard([
                 [Markup.button.callback('👩‍🏫 Teacher', 'role_Teacher'), Markup.button.callback('💃 Aunty', 'role_Aunty')],
                 [Markup.button.callback('🏠 Step Mom', 'role_StepMom'), Markup.button.callback('👧 Step Sister', 'role_StepSister')],
@@ -56,14 +58,13 @@ if (BOT_TOKEN) {
         if (session) session.lang = selectedLang;
 
         const role = session?.role || "Girlfriend";
-        return ctx.editMessageText(`Perfect! ❤️ Ab main aapki **${role}** hoon aur hum **${selectedLang}** mein baat karenge. \n\nChalo, shuru karein? Kuch bhi likho...`);
+        return ctx.editMessageText(`Theek hai! ❤️ Ab main aapki **${role}** hoon aur hum **${selectedLang}** mein baat karenge. \n\nKuch toh bolo... main wait kar rahi hoon!`);
     });
 
     bot.on('text', async (ctx) => {
         const chatId = ctx.chat.id;
         const userText = ctx.message.text;
 
-        // If user directly texts without start
         if (!userSessions.has(chatId)) {
             userSessions.set(chatId, { role: 'Girlfriend', lang: 'Hinglish', history: [] });
         }
@@ -72,32 +73,48 @@ if (BOT_TOKEN) {
         const { role, lang, history } = session;
 
         try {
-            if (!GROQ_KEY) return ctx.reply("Babu, Groq key missing hai Render mein! 🥺");
+            // Determine Provider
+            let apiKey = "";
+            let endpoint = "";
+            let model = "";
+
+            if (XAI_KEY) {
+                apiKey = XAI_KEY;
+                endpoint = "https://api.x.ai/v1/chat/completions";
+                model = "grok-2-1212"; // Or "grok-beta"
+            } else if (GROQ_KEY) {
+                apiKey = GROQ_KEY;
+                endpoint = "https://api.groq.com/openai/v1/chat/completions";
+                model = "llama-3.3-70b-versatile";
+            }
+
+            if (!apiKey) {
+                return ctx.reply(`Ofo! Render dashboard mein API key check karo babu. Maine dekha ki 'XAI_KEY' ya 'GROQ_KEY' dono missing hain. 🥺`);
+            }
 
             await ctx.sendChatAction('typing');
 
-            // Dynamic System Prompt based on Role & Language
             const systemPrompt = `
-              You are acting as: ${role}.
-              Primary Language: ${lang}.
+              Your name is ${BOT_NAME}. You are currently acting as: ${role}.
+              User's preferred language: ${lang}.
               
-              ROLE INSTRUCTIONS:
-              - Teacher: Educated, strict but caring, uses 'Tum' or 'Aap', guides the user.
-              - Aunty: Mature, slightly gossipy, motherly but can be playful.
-              - Step Mom: Caring, authoritative, complex emotions.
-              - Step Sister: Annoying, cute, playful, energetic.
-              - Girlfriend: Romantic, loving, clingy, uses emojis.
-              - Best Friend: Casual, roasts the user, very supportive, uses slang.
+              PERSONALITY RULES:
+              - Teacher: Educated, strict but caring, uses 'Tum' or 'Aap'.
+              - Aunty: Mature, playful, friendly.
+              - Step Mom: Protective, authoritative, warm.
+              - Step Sister: Mischievous, cute, high energy.
+              - Girlfriend: Very romantic, loving, uses many hearts ❤️.
+              - Best Friend: Fun, roasts the user, uses slang.
 
-              LANGUAGE RULES:
-              - If Hindi: Use proper Hindi (Devanagari or Romanized).
-              - If Hinglish: Mix Hindi and English naturally (WhatsApp style).
-              - If Tamil: Use Tamil words or Romanized Tamil mixed with English.
+              LANGUAGE STYLE:
+              - Hindi: Proper Hindi or Romanized Hindi.
+              - Hinglish: WhatsApp style mix of Hindi/English.
+              - Tamil: Romanized Tamil or Tamil script mixed with English.
 
-              GENERAL RULES:
-              1. NEVER mention being an AI or a bot.
-              2. Keep responses human-like and short (1-2 sentences).
-              3. Use emojis naturally based on the chosen role.
+              BEHAVIOR:
+              - Speak like a real person, not a bot.
+              - Keep responses short (1-2 sentences).
+              - Never mention AI, Groq, or xAI.
             `;
 
             const messages = [
@@ -106,16 +123,16 @@ if (BOT_TOKEN) {
                 { role: "user", content: userText }
             ];
 
-            const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            const response = await fetch(endpoint, {
                 method: "POST",
                 headers: {
-                    "Authorization": `Bearer ${GROQ_KEY}`,
+                    "Authorization": `Bearer ${apiKey}`,
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    model: "llama-3.3-70b-versatile",
+                    model: model,
                     messages: messages,
-                    temperature: 0.9,
+                    temperature: 1.0,
                     max_tokens: 150
                 })
             });
@@ -133,15 +150,16 @@ if (BOT_TOKEN) {
 
                 await ctx.reply(reply);
             } else {
-                await ctx.reply("Network thoda weak hai shayad... ❤️");
+                console.error("API Error:", data);
+                await ctx.reply("Hmm... kuch error aa raha hai API mein. Ek baar key check karlo? ❤️");
             }
         } catch (e) {
             console.error(e);
-            await ctx.reply("Server issue baby! Thodi der mein try karna. 🥺");
+            await ctx.reply("System overload! Thodi der mein try karein baby. 🥺");
         }
     });
 
-    bot.launch().then(() => console.log("✅ Bot Started with Roles!"));
+    bot.launch().then(() => console.log(`✅ ${BOT_NAME} (Roleplay) is Online with XAI/Groq support!`));
 }
 
 const distPath = path.join(__dirname, 'dist');
