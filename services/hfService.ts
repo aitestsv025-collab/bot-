@@ -22,11 +22,21 @@ export class AiChatService {
       
       try {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${token}`;
+        
+        let langContext = "";
+        if (this.config.language === 'Tamil') {
+          langContext = "Respond ONLY in Tamil script. No English.";
+        } else if (this.config.language === 'Hindi') {
+          langContext = "Respond ONLY in Hindi Devanagari script. No English.";
+        } else {
+          langContext = "Respond in Hinglish (Roman script).";
+        }
+
         const response = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: `System: Act as ${this.config.name} (${this.config.personality}). Mood: ${this.config.mood}. Use Hinglish. User: ${text}` }] }]
+            contents: [{ parts: [{ text: `System: Act as ${this.config.name} (Role: ${this.config.personality}). ${langContext} User: ${text}` }] }]
           })
         });
         const result = await response.json();
@@ -36,7 +46,6 @@ export class AiChatService {
       }
     }
 
-    // Fallback for others (Groq/xAI)
-    return "Simulation only supports Gemini for now. Please deploy to test other providers.";
+    return "Simulation only supports Gemini for now.";
   }
 }

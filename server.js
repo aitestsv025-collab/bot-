@@ -15,7 +15,7 @@ const BOT_NAME = process.env.BOT_NAME || "Malini";
 
 const userSessions = new Map();
 
-console.log(`--- ❤️ Malini Bot v7.0 (Roles & Tamil Update) ---`);
+console.log(`--- ❤️ Malini Bot v8.0 (Step Sister & Tamil Update) ---`);
 
 if (BOT_TOKEN && GEMINI_KEY) {
     const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
@@ -27,7 +27,7 @@ if (BOT_TOKEN && GEMINI_KEY) {
             Markup.inlineKeyboard([
                 [Markup.button.callback('❤️ Girlfriend', 'role_Girlfriend'), Markup.button.callback('🤝 Best Friend', 'role_BestFriend')],
                 [Markup.button.callback('👩‍🏫 Teacher', 'role_Teacher'), Markup.button.callback('💃 Aunty', 'role_Aunty')],
-                [Markup.button.callback('🏠 Step Mom', 'role_StepMom'), Markup.button.callback('📚 Step Teacher', 'role_StepTeacher')]
+                [Markup.button.callback('🏠 Step Mom', 'role_StepMom'), Markup.button.callback('👧 Step Sister', 'role_StepSister')]
             ])
         );
     });
@@ -47,7 +47,7 @@ if (BOT_TOKEN && GEMINI_KEY) {
         const session = userSessions.get(ctx.chat.id);
         if (session) session.lang = ctx.match[1];
         const langDisplay = session.lang === 'Tamil' ? 'Tamil' : (session.lang === 'Hindi' ? 'Hindi' : 'Hinglish');
-        return ctx.editMessageText(`Perfect! ❤️ Ab hum ${langDisplay} mein chat karenge. Kuch bhi pucho apni ${session?.role || 'Girlfriend'} se...`);
+        return ctx.editMessageText(`Perfect! ❤️ Ab hum sirf ${langDisplay} mein hi baat karenge. Kuch bhi pucho apni ${session?.role || 'Girlfriend'} se...`);
     });
 
     bot.on('text', async (ctx) => {
@@ -69,12 +69,15 @@ if (BOT_TOKEN && GEMINI_KEY) {
                 parts: [{ text: h.content }]
             }));
 
-            // Enhanced prompt for strict language adherence
-            const languageInstruction = lang === 'Tamil' 
-                ? "STRICTLY respond ONLY in Tamil language (use Tamil script). Do not use English or Hindi."
-                : (lang === 'Hindi' 
-                    ? "STRICTLY respond ONLY in Hindi language (use Devanagari script). Do not use English." 
-                    : "Respond in Hinglish (a mix of Hindi and English written in Roman script).");
+            // Extremely strict language enforcement instructions
+            let languageInstruction = "";
+            if (lang === 'Tamil') {
+              languageInstruction = "CRITICAL: You MUST speak ONLY in Tamil language using Tamil script. Do not use a single word of English or Hindi. If you don't know a word in Tamil, find a Tamil alternative. STRICTLY TAMIL ONLY.";
+            } else if (lang === 'Hindi') {
+              languageInstruction = "CRITICAL: You MUST speak ONLY in Hindi language using Devanagari script. Do not use English words. Use pure or common Hindi. STRICTLY HINDI ONLY.";
+            } else {
+              languageInstruction = "Speak in Hinglish (Hindi words written in Roman/English script mixed with common English). Make it sound like a modern urban Indian girl.";
+            }
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
@@ -83,7 +86,7 @@ if (BOT_TOKEN && GEMINI_KEY) {
                     { parts: [{ text: userText }] }
                 ],
                 config: {
-                    systemInstruction: `Your name is ${BOT_NAME}. Act as: ${role}. ${languageInstruction} You are the user's ${role}. Be very loving, sweet, sometimes naughty, and very caring. Use emojis. Keep replies short and sweet for Telegram. Always stay in character.`,
+                    systemInstruction: `Your name is ${BOT_NAME}. Act as: ${role}. ${languageInstruction} You are the user's ${role}. Be very loving, sweet, affectionate, and stay in character. Use emojis related to the language and culture. Keep replies short and sweet for Telegram. Never break character.`,
                     temperature: 1,
                     topP: 0.95,
                     topK: 40
