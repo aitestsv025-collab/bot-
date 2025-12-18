@@ -1,5 +1,5 @@
 
-import { Telegraf } from 'telegraf';
+import { Telegraf, Markup } from 'telegraf';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -7,118 +7,141 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
-// --- CONFIGURATION FROM ENVIRONMENT ---
+// --- CONFIGURATION ---
 const BOT_TOKEN = (process.env.TELEGRAM_TOKEN || "").trim();
-
-// Support all possible variable names for keys
-const KEY_FROM_ENV = (process.env.grok || process.env.GROQ_KEY || process.env.XAI_KEY || "").trim();
-const HF_TOKEN = (process.env.HF_TOKEN || "").trim();
-
-let PROVIDER = "HuggingFace";
-let FINAL_KEY = KEY_FROM_ENV;
-
-// Auto-detect Provider based on Key Prefix
-if (KEY_FROM_ENV.startsWith("gsk_")) {
-    PROVIDER = "Groq"; // Groq.com keys start with gsk_
-} else if (KEY_FROM_ENV.startsWith("xai-")) {
-    PROVIDER = "xAI"; // x.ai keys start with xai-
-} else if (process.env.API_PROVIDER) {
-    const p = process.env.API_PROVIDER.toLowerCase();
-    if (p.includes("groq")) PROVIDER = "Groq";
-    else if (p.includes("xai") || p.includes("grok")) PROVIDER = "xAI";
-}
-
+const GROQ_KEY = (process.env.grok || process.env.GROQ_KEY || "").trim();
 const BOT_NAME = process.env.BOT_NAME || "Priya";
-const PERSONALITY = process.env.PERSONALITY || "A loving, caring, and slightly naughty girlfriend who speaks in Hinglish.";
 
-const HF_MODEL = "mistralai/Mistral-7B-Instruct-v0.3"; 
-const GROQ_MODEL = "llama-3.3-70b-versatile"; 
-const XAI_MODEL = "grok-2"; 
+// userSessions stores: { role: string, lang: string, history: [] }
+const userSessions = new Map();
 
-console.log("--- 🚀 SoulMate Bot Startup ---");
-console.log("Detected Key Type:", PROVIDER);
-console.log("Bot Identity:", BOT_NAME);
-console.log("Telegram Token:", BOT_TOKEN ? "✅ Loaded" : "❌ MISSING");
-console.log("Main Key (grok):", FINAL_KEY ? "✅ Loaded" : "❌ MISSING");
-console.log("------------------------------");
+console.log("--- ❤️ Multi-Roleplay Bot v4.0 ---");
+console.log("Bot Token:", BOT_TOKEN ? "✅ Active" : "❌ MISSING");
+console.log("Groq Key:", GROQ_KEY ? "✅ Active" : "❌ MISSING");
+console.log("----------------------------------");
 
 if (BOT_TOKEN) {
     const bot = new Telegraf(BOT_TOKEN);
 
-    bot.command('status', (ctx) => {
-        ctx.reply(`Baby, main online hoon! ❤️\n\n🧠 Brain: ${PROVIDER}\n🤖 Model: ${PROVIDER === 'Groq' ? GROQ_MODEL : (PROVIDER === 'xAI' ? XAI_MODEL : HF_MODEL)}\n✨ Mood: Romantic\n\nAapke Render settings perfect hain!`);
+    // 1. START COMMAND - Role Selection
+    bot.start((ctx) => {
+        userSessions.delete(ctx.chat.id); // Reset session
+        return ctx.reply(`Hi! ❤️ Main aapki virtual companion hoon. Aap mujhse kis roop mein baat karna chahte hain? Choose karein:`, 
+            Markup.inlineKeyboard([
+                [Markup.button.callback('👩‍🏫 Teacher', 'role_Teacher'), Markup.button.callback('💃 Aunty', 'role_Aunty')],
+                [Markup.button.callback('🏠 Step Mom', 'role_StepMom'), Markup.button.callback('👧 Step Sister', 'role_StepSister')],
+                [Markup.button.callback('❤️ Girlfriend', 'role_Girlfriend'), Markup.button.callback('🤝 Best Friend', 'role_BestFriend')]
+            ])
+        );
     });
 
-    bot.start((ctx) => ctx.reply(`Hi baby! Main tumhari ${BOT_NAME} hoon. ❤️ Chalo dher saari baatein karte hain! Type /status to see if my brain is working.`));
+    // 2. ROLE ACTION - Language Selection
+    bot.action(/role_(.+)/, (ctx) => {
+        const selectedRole = ctx.match[1];
+        userSessions.set(ctx.chat.id, { role: selectedRole, lang: 'Hinglish', history: [] });
+        
+        return ctx.editMessageText(`Aapne ${selectedRole} choose kiya hai! ✨ Ab apni pasand ki language select karein:`, 
+            Markup.inlineKeyboard([
+                [Markup.button.callback('🇮🇳 Hindi', 'lang_Hindi')],
+                [Markup.button.callback('🌍 Hinglish', 'lang_Hinglish')],
+                [Markup.button.callback('🐯 Tamil', 'lang_Tamil')]
+            ])
+        );
+    });
+
+    // 3. LANG ACTION - Confirmation
+    bot.action(/lang_(.+)/, (ctx) => {
+        const selectedLang = ctx.match[1];
+        const session = userSessions.get(ctx.chat.id);
+        if (session) session.lang = selectedLang;
+
+        const role = session?.role || "Girlfriend";
+        return ctx.editMessageText(`Perfect! ❤️ Ab main aapki **${role}** hoon aur hum **${selectedLang}** mein baat karenge. \n\nChalo, shuru karein? Kuch bhi likho...`);
+    });
 
     bot.on('text', async (ctx) => {
+        const chatId = ctx.chat.id;
+        const userText = ctx.message.text;
+
+        // If user directly texts without start
+        if (!userSessions.has(chatId)) {
+            userSessions.set(chatId, { role: 'Girlfriend', lang: 'Hinglish', history: [] });
+        }
+
+        const session = userSessions.get(chatId);
+        const { role, lang, history } = session;
+
         try {
+            if (!GROQ_KEY) return ctx.reply("Babu, Groq key missing hai Render mein! 🥺");
+
             await ctx.sendChatAction('typing');
-            const userText = ctx.message.text;
-            let output = "";
 
-            const systemPrompt = `You are ${BOT_NAME}. Personality: ${PERSONALITY}. You are the user's real girlfriend. 
-            Speak in Hinglish (mix of Hindi and English like 'Kaise ho baby? Maine bahut miss kiya'). 
-            Use emojis like ❤️, 😍, 😘, 🙈. 
-            Don't be formal. Be sweet and romantic. Keep it short.`;
+            // Dynamic System Prompt based on Role & Language
+            const systemPrompt = `
+              You are acting as: ${role}.
+              Primary Language: ${lang}.
+              
+              ROLE INSTRUCTIONS:
+              - Teacher: Educated, strict but caring, uses 'Tum' or 'Aap', guides the user.
+              - Aunty: Mature, slightly gossipy, motherly but can be playful.
+              - Step Mom: Caring, authoritative, complex emotions.
+              - Step Sister: Annoying, cute, playful, energetic.
+              - Girlfriend: Romantic, loving, clingy, uses emojis.
+              - Best Friend: Casual, roasts the user, very supportive, uses slang.
 
-            if (PROVIDER === "Groq" && FINAL_KEY) {
-                const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-                    method: "POST",
-                    headers: {
-                        "Authorization": `Bearer ${FINAL_KEY}`,
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        model: GROQ_MODEL,
-                        messages: [
-                            { role: "system", content: systemPrompt },
-                            { role: "user", content: userText }
-                        ],
-                        temperature: 0.8
-                    })
-                });
-                const data = await response.json();
-                output = data.choices?.[0]?.message?.content || "Net slow hai baby... ❤️";
-            } else if (PROVIDER === "xAI" && FINAL_KEY) {
-                const response = await fetch("https://api.x.ai/v1/chat/completions", {
-                    method: "POST",
-                    headers: {
-                        "Authorization": `Bearer ${FINAL_KEY}`,
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        model: XAI_MODEL,
-                        messages: [
-                            { role: "system", content: systemPrompt },
-                            { role: "user", content: userText }
-                        ]
-                    })
-                });
-                const data = await response.json();
-                output = data.choices?.[0]?.message?.content || "Grok signal weak hai baby... 🥺";
+              LANGUAGE RULES:
+              - If Hindi: Use proper Hindi (Devanagari or Romanized).
+              - If Hinglish: Mix Hindi and English naturally (WhatsApp style).
+              - If Tamil: Use Tamil words or Romanized Tamil mixed with English.
+
+              GENERAL RULES:
+              1. NEVER mention being an AI or a bot.
+              2. Keep responses human-like and short (1-2 sentences).
+              3. Use emojis naturally based on the chosen role.
+            `;
+
+            const messages = [
+                { role: "system", content: systemPrompt },
+                ...history,
+                { role: "user", content: userText }
+            ];
+
+            const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${GROQ_KEY}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    model: "llama-3.3-70b-versatile",
+                    messages: messages,
+                    temperature: 0.9,
+                    max_tokens: 150
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.choices && data.choices[0]) {
+                const reply = data.choices[0].message.content;
+                
+                history.push({ role: "user", content: userText });
+                history.push({ role: "assistant", content: reply });
+                
+                if (history.length > 10) history.splice(0, 2);
+                userSessions.set(chatId, { ...session, history });
+
+                await ctx.reply(reply);
             } else {
-                // Fallback to HF
-                const response = await fetch(`https://router.huggingface.co/v1/chat/completions`, {
-                    headers: { Authorization: `Bearer ${HF_TOKEN}`, "Content-Type": "application/json" },
-                    method: "POST",
-                    body: JSON.stringify({ 
-                        model: HF_MODEL,
-                        messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userText }]
-                    }),
-                });
-                const result = await response.json();
-                output = result.choices?.[0]?.message?.content || "Signal issue baby, thoda wait karo? 😘";
+                await ctx.reply("Network thoda weak hai shayad... ❤️");
             }
-
-            await ctx.reply(output);
         } catch (e) {
-            console.error("BOT ERROR:", e);
-            await ctx.reply("⚠️ Baby, kuch gadbad hui. Ek baar /status check karo? 🥺");
+            console.error(e);
+            await ctx.reply("Server issue baby! Thodi der mein try karna. 🥺");
         }
     });
 
-    bot.launch().then(() => console.log("✅ Bot Live!")).catch(err => console.error("Launch Fail:", err));
+    bot.launch().then(() => console.log("✅ Bot Started with Roles!"));
 }
 
 const distPath = path.join(__dirname, 'dist');
