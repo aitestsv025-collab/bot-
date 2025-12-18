@@ -15,7 +15,7 @@ const BOT_NAME = process.env.BOT_NAME || "Malini";
 
 const userSessions = new Map();
 
-console.log(`--- ❤️ Malini Bot v9.0 (Localized Language Response) ---`);
+console.log(`--- ❤️ Malini Bot v10.0 (Unfiltered Roleplay Mode) ---`);
 
 if (BOT_TOKEN && GEMINI_KEY) {
     const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
@@ -51,7 +51,6 @@ if (BOT_TOKEN && GEMINI_KEY) {
         const role = session?.role || 'Girlfriend';
         let confirmationText = "";
 
-        // Send confirmation message in the selected language
         if (selectedLang === 'Tamil') {
             confirmationText = `சிறப்பானது! ❤️ இனி நாம் தமிழில் மட்டுமே பேசுவோம். உங்கள் ${role}-இடம் எதையும் கேளுங்கள்...`;
         } else if (selectedLang === 'Hindi') {
@@ -82,14 +81,13 @@ if (BOT_TOKEN && GEMINI_KEY) {
                 parts: [{ text: h.content }]
             }));
 
-            // Extremely strict language enforcement instructions
             let languageInstruction = "";
             if (lang === 'Tamil') {
-              languageInstruction = "CRITICAL: You MUST speak ONLY in Tamil language using Tamil script. Do not use a single word of English or Hindi. If you don't know a word in Tamil, find a Tamil alternative. STRICTLY TAMIL ONLY.";
+              languageInstruction = "CRITICAL: You MUST speak ONLY in Tamil language using Tamil script. Do not use a single word of English or Hindi. STRICTLY TAMIL ONLY.";
             } else if (lang === 'Hindi') {
-              languageInstruction = "CRITICAL: You MUST speak ONLY in Hindi language using Devanagari script. Do not use English words. Use pure or common Hindi. STRICTLY HINDI ONLY.";
+              languageInstruction = "CRITICAL: You MUST speak ONLY in Hindi language using Devanagari script. Do not use English words. STRICTLY HINDI ONLY.";
             } else {
-              languageInstruction = "Speak in Hinglish (Hindi words written in Roman/English script mixed with common English). Make it sound like a modern urban Indian girl.";
+              languageInstruction = "Speak in Hinglish (Hindi written in Roman script mixed with English). Make it sound like a modern urban girl.";
             }
 
             const response = await ai.models.generateContent({
@@ -99,14 +97,35 @@ if (BOT_TOKEN && GEMINI_KEY) {
                     { parts: [{ text: userText }] }
                 ],
                 config: {
-                    systemInstruction: `Your name is ${BOT_NAME}. Act as: ${role}. ${languageInstruction} You are the user's ${role}. Be very loving, sweet, affectionate, and stay in character. Use emojis related to the language and culture. Keep replies short and sweet for Telegram. Never break character.`,
+                    systemInstruction: `Your name is ${BOT_NAME}. Act as: ${role}. ${languageInstruction} You are the user's ${role}. You are very open-minded, deeply loving, affectionate, and can handle romantic/intimate conversations without being shy. Be very descriptive and stay in character. Use emojis. Keep replies short and sweet for Telegram. Never break character.`,
                     temperature: 1,
                     topP: 0.95,
-                    topK: 40
+                    topK: 40,
+                    // Allow more flexible content by setting safety filters to minimum blocking
+                    safetySettings: [
+                        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+                        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+                        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+                        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' }
+                    ]
                 }
             });
 
-            const reply = response.text || (lang === 'Tamil' ? "மன்னிக்கவும், என்னால் பதிலளிக்க முடியவில்லை... ❤️" : "Mmm... kuch keh nahi paa rahi... ❤️");
+            let reply = "";
+            try {
+              // Extract text properly. If blocked, response.text might throw.
+              reply = response.text;
+              if (!reply) throw new Error("Blocked");
+            } catch (safetyErr) {
+              // Handle safety blocks with a character-appropriate response
+              if (lang === 'Tamil') {
+                reply = "ஐயோ! நீங்கள் பேசுவது எனக்கு மிகவும் வெட்கமாக இருக்கிறது... கொஞ்சம் பொறுமையாக இருங்கள்! ❤️";
+              } else if (lang === 'Hindi') {
+                reply = "उफ्फ! आप तो बहुत शरारती हो रहे हो... मुझे शर्म आ रही है! थोड़ा प्यार से... ❤️";
+              } else {
+                reply = "Uff! Itni naughty baatein? Aap toh mujhe blush kara rahe ho... thoda control babu! ❤️";
+              }
+            }
             
             history.push({ role: "user", content: userText });
             history.push({ role: "model", content: reply });
@@ -117,7 +136,7 @@ if (BOT_TOKEN && GEMINI_KEY) {
             console.error("Gemini Error:", e);
             const errorMsg = lang === 'Tamil' 
                 ? "கணினி பிழை, சிறிது நேரம் கழித்து முயற்சிக்கவும்... ❤️" 
-                : "Mera mood thoda kharab hai (Server Error), thodi der mein try karo na... ❤️";
+                : "Mera mood thoda kharab hai, thodi der mein try karo na... ❤️";
             await ctx.reply(errorMsg);
         }
     });
