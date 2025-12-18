@@ -15,17 +15,17 @@ const BOT_NAME = process.env.BOT_NAME || "Malini";
 
 const userSessions = new Map();
 
-// Scenario Mapping for immersive start - ensures the AI knows exactly where the story begins
+// Scenario Mapping for immersive start - strictly focused on the setting
 const roleScenarios = {
-    'Girlfriend': "It's a rainy evening, we are cuddling on the sofa watching a movie. You just looked at me with so much love.",
-    'BestFriend': "We are at our favorite cafe, I just ordered your favorite coffee. I have a secret to tell you.",
-    'Teacher': "The classroom is empty after school. I'm sitting at my desk checking your papers. You just walked in to ask a doubt about your low marks.",
-    'Aunty': "I'm your neighbor. I just came over to give some home-made sweets, and I realized you're home alone and looking a bit tired.",
-    'StepMom': "I'm in the kitchen making dinner. You just came home very late and tried to sneak past me into your room, but I caught you.",
-    'StepSister': "I'm in your room, wearing your favorite oversized hoodie. You just caught me red-handed while I was looking through your drawer."
+    'Girlfriend': "It's evening. I'm waiting for you at the park. You just arrived.",
+    'BestFriend': "We're hanging out at the rooftop. I'm looking at the sunset.",
+    'Teacher': "I'm sitting in the staff room. You just knocked on the door to submit your assignment.",
+    'Aunty': "I'm watering my plants in the balcony. I see you coming home from work.",
+    'StepMom': "I'm reading a book in the living room. You just walked in silently.",
+    'StepSister': "I'm sitting on the floor in your room, busy with my phone. You just opened the door."
 };
 
-console.log(`--- ❤️ Malini Bot v13.0 (Fast Start & Deep Persona) ---`);
+console.log(`--- ❤️ Malini Bot v14.0 (Natural Pacing & Shorter Intros) ---`);
 
 if (BOT_TOKEN && GEMINI_KEY) {
     const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
@@ -40,7 +40,6 @@ if (BOT_TOKEN && GEMINI_KEY) {
 
     bot.start((ctx) => {
         userSessions.delete(ctx.chat.id);
-        // Simplified start message as requested
         return ctx.reply(`Select your role:`, 
             Markup.inlineKeyboard([
                 [Markup.button.callback('❤️ Girlfriend', 'role_Girlfriend'), Markup.button.callback('🤝 Best Friend', 'role_BestFriend')],
@@ -67,45 +66,42 @@ if (BOT_TOKEN && GEMINI_KEY) {
         if (session) session.lang = selectedLang;
         
         const role = session?.role || 'Girlfriend';
-        const scenario = roleScenarios[role] || "We are meeting after a long time.";
+        const scenario = roleScenarios[role] || "We just met.";
         
-        // Removed the "Wait karo..." message to make it faster
         await ctx.sendChatAction('typing');
 
         try {
             let languageInstruction = "";
             if (selectedLang === 'Tamil') languageInstruction = "STRICTLY TAMIL ONLY (Tamil Script).";
             else if (selectedLang === 'Hindi') languageInstruction = "STRICTLY HINDI ONLY (Devanagari Script).";
-            else languageInstruction = "HINGLISH (Roman Script). Mix Hindi and English like a modern girl.";
+            else languageInstruction = "HINGLISH (Roman Script). Mix Hindi and English.";
 
-            // Specific persona instructions based on role
             let roleContext = "";
-            if (role === 'Teacher') roleContext = "You are strict but secretly affectionate. You use professional but warm language.";
-            else if (role === 'Girlfriend') roleContext = "You are deeply in love, very clingy, and romantic.";
-            else if (role === 'Aunty') roleContext = "You are mature, caring, and a bit playful/teasing.";
-            else if (role === 'StepMom') roleContext = "You are responsible but have a complicated, soft spot for him.";
-            else if (role === 'StepSister') roleContext = "You are bratty, annoying, but deeply attached to him.";
-            else roleContext = "You are his closest friend, you know all his secrets.";
+            if (role === 'Teacher') roleContext = "You are professional and a bit formal. Do not flirt. Be serious about the studies.";
+            else if (role === 'Girlfriend') roleContext = "You are happy to see him but keep it simple. No heavy flirting yet.";
+            else if (role === 'Aunty') roleContext = "You are kind and neighborly. Ask about his day normally.";
+            else if (role === 'StepMom') roleContext = "You are calm and observational. Just a normal family interaction.";
+            else if (role === 'StepSister') roleContext = "You are slightly annoyed or just chilling. Casual sibling vibe.";
+            else roleContext = "Casual and friendly talk.";
 
             const introResponse = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: `Scenario: ${scenario}. Introduce yourself as ${BOT_NAME}, age 23. Immediately start the scene. Speak directly to me as your ${role}.`,
+                contents: `Scenario: ${scenario}. Introduce yourself as ${BOT_NAME}, age 23. Keep it VERY SHORT (max 2-3 lines). Start the scene naturally. Do NOT flirt yet.`,
                 config: {
-                    systemInstruction: `You are ${BOT_NAME}, acting as: ${role}. ${languageInstruction} ${roleContext} Dive STRAIGHT into the story. Never explain that you are an AI. Be very descriptive about your actions (e.g., *I look at you with a smile*). Stay in character 100%.`,
-                    temperature: 1,
+                    systemInstruction: `You are ${BOT_NAME}, acting as: ${role}. ${languageInstruction} ${roleContext} Dive into the story. Keep your response short and realistic. Do not start with love or flirting; let the conversation build up naturally over time.`,
+                    temperature: 0.8,
                     safetySettings
                 }
             });
 
-            const introText = introResponse.text || "Hey... finally you're here. ❤️";
+            const introText = introResponse.text || "Hey. ❤️";
             session.history.push({ role: "model", content: introText });
             
-            // Delete the selection menu and send the first story message
             await ctx.deleteMessage();
             await ctx.reply(introText);
         } catch (e) {
             console.error("Intro Error:", e);
-            await ctx.reply(`Hey! ❤️ Let's start our story...`);
+            await ctx.reply(`Hi. ❤️`);
         }
     });
 
@@ -137,8 +133,8 @@ if (BOT_TOKEN && GEMINI_KEY) {
                 model: 'gemini-3-flash-preview',
                 contents: [...chatHistory, { parts: [{ text: userText }] }],
                 config: {
-                    systemInstruction: `Name: ${BOT_NAME}. Role: ${role}. ${langPrompt} You are currently in a roleplay session. Be affectionate, highly descriptive of your physical actions using *asterisks*, and respond to the user's specific words. Keep the personality of a ${role} consistent. Use emojis. Keep replies short.`,
-                    temperature: 1,
+                    systemInstruction: `Name: ${BOT_NAME}. Role: ${role}. ${langPrompt} Stay strictly in character. If the user is being polite, you be polite. If they are cold, you be cold. Do NOT start flirting unless the user starts it first. Be a realistic ${role}. Keep replies short and use emojis sparingly but effectively. Use *asterisks* for actions.`,
+                    temperature: 0.9,
                     topP: 0.95,
                     safetySettings
                 }
@@ -149,16 +145,16 @@ if (BOT_TOKEN && GEMINI_KEY) {
               reply = response.text;
               if (!reply) throw new Error("Blocked");
             } catch (err) {
-                reply = lang === 'Hindi' ? "उफ्फ! आप तो बहुत शरारती हो रहे हो... मुझे शर्म आ रही है! ❤️" : "Uff! You're making me blush way too much... stop it! ❤️";
+                reply = lang === 'Hindi' ? "मुझे नहीं पता क्या कहूँ... ❤️" : "I'm not sure how to respond to that... ❤️";
             }
             
             history.push({ role: "user", content: userText });
             history.push({ role: "model", content: reply });
-            if (history.length > 12) history.splice(0, 2);
+            if (history.length > 10) history.splice(0, 2);
             
             await ctx.reply(reply);
         } catch (e) {
-            await ctx.reply("Mmm... let's talk about something else? ❤️");
+            await ctx.reply("❤️");
         }
     });
 
