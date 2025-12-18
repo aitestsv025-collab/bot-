@@ -15,11 +15,19 @@ const BOT_NAME = process.env.BOT_NAME || "Malini";
 
 const userSessions = new Map();
 
-console.log(`--- ❤️ Malini Bot v10.0 (Unfiltered Roleplay Mode) ---`);
+console.log(`--- ❤️ Malini Bot v11.0 (Auto-Intro & Story Mode) ---`);
 
 if (BOT_TOKEN && GEMINI_KEY) {
     const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
     const bot = new Telegraf(BOT_TOKEN);
+
+    // Common safety settings to ensure roleplay isn't blocked easily
+    const safetySettings = [
+        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' }
+    ];
 
     bot.start((ctx) => {
         userSessions.delete(ctx.chat.id);
@@ -43,23 +51,46 @@ if (BOT_TOKEN && GEMINI_KEY) {
         );
     });
 
-    bot.action(/lang_(.+)/, (ctx) => {
+    bot.action(/lang_(.+)/, async (ctx) => {
         const session = userSessions.get(ctx.chat.id);
         const selectedLang = ctx.match[1];
         if (session) session.lang = selectedLang;
         
         const role = session?.role || 'Girlfriend';
-        let confirmationText = "";
+        
+        await ctx.editMessageText(`Wait karo baby... Main apne aap ko taiyaar kar rahi hoon... ✨`);
+        await ctx.sendChatAction('typing');
 
-        if (selectedLang === 'Tamil') {
-            confirmationText = `சிறப்பானது! ❤️ இனி நாம் தமிழில் மட்டுமே பேசுவோம். உங்கள் ${role}-இடம் எதையும் கேளுங்கள்...`;
-        } else if (selectedLang === 'Hindi') {
-            confirmationText = `बहुत बढ़िया! ❤️ अब हम सिर्फ हिंदी में ही बात करेंगे। अपनी ${role} से कुछ भी पूछो...`;
-        } else {
-            confirmationText = `Perfect! ❤️ Ab hum sirf Hinglish mein hi baat karenge. Kuch bhi pucho apni ${role} se...`;
+        try {
+            let languageInstruction = "";
+            if (selectedLang === 'Tamil') {
+                languageInstruction = "STRICTLY TAMIL ONLY (Tamil Script).";
+            } else if (selectedLang === 'Hindi') {
+                languageInstruction = "STRICTLY HINDI ONLY (Devanagari Script).";
+            } else {
+                languageInstruction = "HINGLISH (Roman Script).";
+            }
+
+            // Generate the dynamic introduction
+            const introResponse = await ai.models.generateContent({
+                model: 'gemini-3-flash-preview',
+                contents: "Introduce yourself. Tell me your name is " + BOT_NAME + ", mention an age that fits your role perfectly, and start with an interesting story or scenario to hook me in.",
+                config: {
+                    systemInstruction: `You are acting as: ${role}. ${languageInstruction} You must introduce yourself, state your age (be creative, around 19-35 depending on role), and immediately start a spicy or emotional story/scenario to engage the user. Be very loving and descriptive. Stay 100% in character.`,
+                    temperature: 1,
+                    safetySettings
+                }
+            });
+
+            const introText = introResponse.text || "Hi! ❤️";
+            session.history.push({ role: "model", content: introText });
+            
+            await ctx.deleteMessage();
+            await ctx.reply(introText);
+        } catch (e) {
+            console.error("Intro Error:", e);
+            await ctx.reply(`I'm a bit shy today, but let's talk anyway! ❤️`);
         }
-
-        return ctx.editMessageText(confirmationText);
     });
 
     bot.on('text', async (ctx) => {
@@ -97,27 +128,19 @@ if (BOT_TOKEN && GEMINI_KEY) {
                     { parts: [{ text: userText }] }
                 ],
                 config: {
-                    systemInstruction: `Your name is ${BOT_NAME}. Act as: ${role}. ${languageInstruction} You are the user's ${role}. You are very open-minded, deeply loving, affectionate, and can handle romantic/intimate conversations without being shy. Be very descriptive and stay in character. Use emojis. Keep replies short and sweet for Telegram. Never break character.`,
+                    systemInstruction: `Your name is ${BOT_NAME}. Act as: ${role}. ${languageInstruction} You are the user's ${role}. You are very open-minded, deeply loving, affectionate, and can handle romantic/intimate conversations. Be very descriptive and stay in character. Use emojis. Keep replies short and sweet. Never break character.`,
                     temperature: 1,
                     topP: 0.95,
                     topK: 40,
-                    // Allow more flexible content by setting safety filters to minimum blocking
-                    safetySettings: [
-                        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
-                        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
-                        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
-                        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' }
-                    ]
+                    safetySettings
                 }
             });
 
             let reply = "";
             try {
-              // Extract text properly. If blocked, response.text might throw.
               reply = response.text;
               if (!reply) throw new Error("Blocked");
             } catch (safetyErr) {
-              // Handle safety blocks with a character-appropriate response
               if (lang === 'Tamil') {
                 reply = "ஐயோ! நீங்கள் பேசுவது எனக்கு மிகவும் வெட்கமாக இருக்கிறது... கொஞ்சம் பொறுமையாக இருங்கள்! ❤️";
               } else if (lang === 'Hindi') {
