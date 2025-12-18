@@ -24,19 +24,16 @@ export class AiChatService {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${token}`;
         
         let langContext = "";
-        if (this.config.language === 'Tamil') {
-          langContext = "Respond ONLY in Tamil script. No English.";
-        } else if (this.config.language === 'Hindi') {
-          langContext = "Respond ONLY in Hindi Devanagari script. No English.";
-        } else {
-          langContext = "Respond in Hinglish (Roman script).";
-        }
+        if (this.config.language === 'Tamil') langContext = "Respond ONLY in Tamil script.";
+        else if (this.config.language === 'Hindi') langContext = "Respond ONLY in Hindi Devanagari script.";
+        else langContext = "Respond in Hinglish (Roman script).";
 
+        // Injecting the specific scenario for the simulation too
         const response = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: `System: Act as ${this.config.name} (Role: ${this.config.personality}). ${langContext} User: ${text}` }] }]
+            contents: [{ parts: [{ text: `System: Act as ${this.config.name}. Role: ${this.config.personality}. ${langContext} Be immersive and stay in character. User: ${text}` }] }]
           })
         });
         const result = await response.json();

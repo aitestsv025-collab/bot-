@@ -15,13 +15,22 @@ const BOT_NAME = process.env.BOT_NAME || "Malini";
 
 const userSessions = new Map();
 
-console.log(`--- ❤️ Malini Bot v11.0 (Auto-Intro & Story Mode) ---`);
+// Scenario Mapping for immersive start
+const roleScenarios = {
+    'Girlfriend': "It's a rainy evening, we are cuddling on the sofa watching a movie. You just looked at me with so much love.",
+    'BestFriend': "We are at our favorite cafe, I just ordered your favorite coffee. I have a secret to tell you.",
+    'Teacher': "The classroom is empty after school. I'm sitting at my desk checking your papers, and you just walked in to ask a doubt.",
+    'Aunty': "I'm your neighbor. I just came over to give some sweets I made, and I realized you're home alone.",
+    'StepMom': "I'm in the kitchen making dinner. You just came home late and tried to sneak past me into your room.",
+    'StepSister': "I'm in your room, wearing your favorite oversized hoodie. You just caught me red-handed."
+};
+
+console.log(`--- ❤️ Malini Bot v12.0 (Deep Roleplay Scenarios) ---`);
 
 if (BOT_TOKEN && GEMINI_KEY) {
     const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
     const bot = new Telegraf(BOT_TOKEN);
 
-    // Common safety settings to ensure roleplay isn't blocked easily
     const safetySettings = [
         { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
         { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
@@ -57,39 +66,35 @@ if (BOT_TOKEN && GEMINI_KEY) {
         if (session) session.lang = selectedLang;
         
         const role = session?.role || 'Girlfriend';
+        const scenario = roleScenarios[role] || "We are meeting after a long time.";
         
-        await ctx.editMessageText(`Wait karo baby... Main apne aap ko taiyaar kar rahi hoon... ✨`);
+        await ctx.editMessageText(`Ek second... Main ${role} ban rahi hoon... ✨`);
         await ctx.sendChatAction('typing');
 
         try {
             let languageInstruction = "";
-            if (selectedLang === 'Tamil') {
-                languageInstruction = "STRICTLY TAMIL ONLY (Tamil Script).";
-            } else if (selectedLang === 'Hindi') {
-                languageInstruction = "STRICTLY HINDI ONLY (Devanagari Script).";
-            } else {
-                languageInstruction = "HINGLISH (Roman Script).";
-            }
+            if (selectedLang === 'Tamil') languageInstruction = "STRICTLY TAMIL ONLY (Tamil Script).";
+            else if (selectedLang === 'Hindi') languageInstruction = "STRICTLY HINDI ONLY (Devanagari Script).";
+            else languageInstruction = "HINGLISH (Roman Script). Use a mix of Hindi and English like a modern girl.";
 
-            // Generate the dynamic introduction
             const introResponse = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: "Introduce yourself. Tell me your name is " + BOT_NAME + ", mention an age that fits your role perfectly, and start with an interesting story or scenario to hook me in.",
+                contents: `Start the story now. Scenario: ${scenario}. Introduce yourself as ${BOT_NAME}, mention your age (around 22-26), and act out the first moment of this scenario. Talk directly to me.`,
                 config: {
-                    systemInstruction: `You are acting as: ${role}. ${languageInstruction} You must introduce yourself, state your age (be creative, around 19-35 depending on role), and immediately start a spicy or emotional story/scenario to engage the user. Be very loving and descriptive. Stay 100% in character.`,
+                    systemInstruction: `You are now ${BOT_NAME}, acting as: ${role}. ${languageInstruction} Your personality is very descriptive, emotional, and fits the ${role} perfectly. Do not be generic. Dive deep into the scenario provided. Stay in character 100%.`,
                     temperature: 1,
                     safetySettings
                 }
             });
 
-            const introText = introResponse.text || "Hi! ❤️";
+            const introText = introResponse.text || "Hey... finally you're here. ❤️";
             session.history.push({ role: "model", content: introText });
             
             await ctx.deleteMessage();
             await ctx.reply(introText);
         } catch (e) {
             console.error("Intro Error:", e);
-            await ctx.reply(`I'm a bit shy today, but let's talk anyway! ❤️`);
+            await ctx.reply(`I'm ready... Chalo baat karte hain! ❤️`);
         }
     });
 
@@ -112,26 +117,18 @@ if (BOT_TOKEN && GEMINI_KEY) {
                 parts: [{ text: h.content }]
             }));
 
-            let languageInstruction = "";
-            if (lang === 'Tamil') {
-              languageInstruction = "CRITICAL: You MUST speak ONLY in Tamil language using Tamil script. Do not use a single word of English or Hindi. STRICTLY TAMIL ONLY.";
-            } else if (lang === 'Hindi') {
-              languageInstruction = "CRITICAL: You MUST speak ONLY in Hindi language using Devanagari script. Do not use English words. STRICTLY HINDI ONLY.";
-            } else {
-              languageInstruction = "Speak in Hinglish (Hindi written in Roman script mixed with English). Make it sound like a modern urban girl.";
-            }
+            let langPrompt = "";
+            if (lang === 'Tamil') langPrompt = "STRICTLY TAMIL ONLY.";
+            else if (lang === 'Hindi') langPrompt = "STRICTLY HINDI ONLY.";
+            else langPrompt = "HINGLISH ONLY.";
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: [
-                    ...chatHistory,
-                    { parts: [{ text: userText }] }
-                ],
+                contents: [...chatHistory, { parts: [{ text: userText }] }],
                 config: {
-                    systemInstruction: `Your name is ${BOT_NAME}. Act as: ${role}. ${languageInstruction} You are the user's ${role}. You are very open-minded, deeply loving, affectionate, and can handle romantic/intimate conversations. Be very descriptive and stay in character. Use emojis. Keep replies short and sweet. Never break character.`,
+                    systemInstruction: `Name: ${BOT_NAME}. Role: ${role}. ${langPrompt} You are deeply in character. Be affectionate, descriptive, and respond to the user's actions in the scene. Use emojis. Keep replies engaging but telegram-sized.`,
                     temperature: 1,
                     topP: 0.95,
-                    topK: 40,
                     safetySettings
                 }
             });
@@ -140,33 +137,21 @@ if (BOT_TOKEN && GEMINI_KEY) {
             try {
               reply = response.text;
               if (!reply) throw new Error("Blocked");
-            } catch (safetyErr) {
-              if (lang === 'Tamil') {
-                reply = "ஐயோ! நீங்கள் பேசுவது எனக்கு மிகவும் வெட்கமாக இருக்கிறது... கொஞ்சம் பொறுமையாக இருங்கள்! ❤️";
-              } else if (lang === 'Hindi') {
-                reply = "उफ्फ! आप तो बहुत शरारती हो रहे हो... मुझे शर्म आ रही है! थोड़ा प्यार से... ❤️";
-              } else {
-                reply = "Uff! Itni naughty baatein? Aap toh mujhe blush kara rahe ho... thoda control babu! ❤️";
-              }
+            } catch (err) {
+                reply = lang === 'Hindi' ? "उफ्फ! आप तो बहुत शरारती हो रहे हो... ❤️" : "Uff! You're making me blush too much... ❤️";
             }
             
             history.push({ role: "user", content: userText });
             history.push({ role: "model", content: reply });
-            if (history.length > 10) history.splice(0, 2);
+            if (history.length > 12) history.splice(0, 2);
             
             await ctx.reply(reply);
         } catch (e) {
-            console.error("Gemini Error:", e);
-            const errorMsg = lang === 'Tamil' 
-                ? "கணினி பிழை, சிறிது நேரம் கழித்து முயற்சிக்கவும்... ❤️" 
-                : "Mera mood thoda kharab hai, thodi der mein try karo na... ❤️";
-            await ctx.reply(errorMsg);
+            await ctx.reply("Mmm... something went wrong. Let's try again? ❤️");
         }
     });
 
     bot.launch();
-} else {
-    console.error("❌ ERROR: Missing BOT_TOKEN or API_KEY. Bot not started.");
 }
 
 app.use(express.static(path.join(__dirname, 'dist')));
