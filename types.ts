@@ -11,7 +11,7 @@ export interface Message {
   timestamp: Date;
 }
 
-export type ApiProvider = 'HuggingFace' | 'Groq' | 'xAI';
+export type ApiProvider = 'HuggingFace' | 'Groq' | 'xAI' | 'Gemini';
 
 export interface BotConfig {
   name: string;
@@ -19,7 +19,8 @@ export interface BotConfig {
   telegramToken: string;
   hfToken: string;
   groqKey: string;
-  xAiKey: string; 
+  xAiKey: string;
+  geminiKey: string;
   apiProvider: ApiProvider;
   modelId: string;
   mood: 'Romantic' | 'Funny' | 'Supportive' | 'Playful' | 'Naughty';
@@ -33,8 +34,9 @@ export const DEFAULT_CONFIG: BotConfig = {
   hfToken: "",
   groqKey: "",
   xAiKey: "",
-  apiProvider: 'Groq',
-  modelId: "llama-3.3-70b-versatile",
+  geminiKey: "",
+  apiProvider: 'Gemini',
+  modelId: "gemini-3-flash-preview",
   mood: "Romantic",
   language: "Hinglish"
 };

@@ -3,62 +3,51 @@ import { Telegraf, Markup } from 'telegraf';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { GoogleGenAI } from "@google/genai";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
 // --- CONFIGURATION ---
+// Note: Use process.env.API_KEY for Gemini as per global guidelines
 const BOT_TOKEN = (process.env.TELEGRAM_TOKEN || "").trim();
-const XAI_KEY = (process.env.XAI_KEY || "").trim();
-const GROQ_KEY = (process.env.GROK_KEY || process.env.GROQ_KEY || process.env.grok || "").trim();
+const GEMINI_KEY = (process.env.API_KEY || "").trim(); 
 const BOT_NAME = process.env.BOT_NAME || "Malini";
 
-// userSessions stores: { role: string, lang: string, history: [] }
 const userSessions = new Map();
 
-console.log(`--- ❤️ Multi-Roleplay Bot: ${BOT_NAME} v4.2 ---`);
-console.log("Bot Token:", BOT_TOKEN ? "✅ Active" : "❌ MISSING");
-console.log("XAI Key:", XAI_KEY ? "✅ Active" : "❌ MISSING");
-console.log("Groq Key:", GROQ_KEY ? "✅ Active" : "❌ MISSING");
-console.log("----------------------------------");
+console.log(`--- ❤️ Malini Bot v6.0 (Gemini Free Edition) ---`);
+console.log(`Telegram Token: ${BOT_TOKEN ? "✅" : "❌"}`);
+console.log(`Gemini API Key: ${GEMINI_KEY ? "✅" : "❌"}`);
 
-if (BOT_TOKEN) {
+if (BOT_TOKEN && GEMINI_KEY) {
+    const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
     const bot = new Telegraf(BOT_TOKEN);
 
-    // 1. START COMMAND - Role Selection
     bot.start((ctx) => {
-        userSessions.delete(ctx.chat.id); // Reset session
-        return ctx.reply(`Hi! ❤️ Main aapki ${BOT_NAME} hoon. Aap mujhse kis roop mein baat karna chahte hain? Choose karein:`, 
+        userSessions.delete(ctx.chat.id);
+        return ctx.reply(`Hi! ❤️ Main aapki ${BOT_NAME} hoon. Mere saath kaise baat karna chahoge?`, 
             Markup.inlineKeyboard([
-                [Markup.button.callback('👩‍🏫 Teacher', 'role_Teacher'), Markup.button.callback('💃 Aunty', 'role_Aunty')],
-                [Markup.button.callback('🏠 Step Mom', 'role_StepMom'), Markup.button.callback('👧 Step Sister', 'role_StepSister')],
-                [Markup.button.callback('❤️ Girlfriend', 'role_Girlfriend'), Markup.button.callback('🤝 Best Friend', 'role_BestFriend')]
+                [Markup.button.callback('❤️ Girlfriend', 'role_Girlfriend'), Markup.button.callback('🤝 Best Friend', 'role_BestFriend')],
+                [Markup.button.callback('👩‍🏫 Teacher', 'role_Teacher'), Markup.button.callback('💃 Aunty', 'role_Aunty')]
             ])
         );
     });
 
-    // 2. ROLE ACTION - Language Selection
     bot.action(/role_(.+)/, (ctx) => {
         const selectedRole = ctx.match[1];
         userSessions.set(ctx.chat.id, { role: selectedRole, lang: 'Hinglish', history: [] });
-        
-        return ctx.editMessageText(`Aapne ${selectedRole} choose kiya hai! ✨ Ab apni pasand ki language select karein:`, 
+        return ctx.editMessageText(`Theek hai! Main tumhari ${selectedRole} hoon. Language chuno:`, 
             Markup.inlineKeyboard([
-                [Markup.button.callback('🇮🇳 Hindi', 'lang_Hindi')],
-                [Markup.button.callback('🌍 Hinglish', 'lang_Hinglish')],
-                [Markup.button.callback('🐯 Tamil', 'lang_Tamil')]
+                [Markup.button.callback('🇮🇳 Hindi', 'lang_Hindi'), Markup.button.callback('🌍 Hinglish', 'lang_Hinglish')]
             ])
         );
     });
 
-    // 3. LANG ACTION - Confirmation
     bot.action(/lang_(.+)/, (ctx) => {
-        const selectedLang = ctx.match[1];
         const session = userSessions.get(ctx.chat.id);
-        if (session) session.lang = selectedLang;
-
-        const role = session?.role || "Girlfriend";
-        return ctx.editMessageText(`Theek hai! ❤️ Ab main aapki **${role}** hoon aur hum **${selectedLang}** mein baat karenge. \n\nKuch toh bolo... main wait kar rahi hoon!`);
+        if (session) session.lang = ctx.match[1];
+        return ctx.editMessageText(`Perfect! ❤️ Ab hum chat kar sakte hain. Kuch bhi pucho apni ${session?.role || 'Girlfriend'} se...`);
     });
 
     bot.on('text', async (ctx) => {
@@ -73,98 +62,51 @@ if (BOT_TOKEN) {
         const { role, lang, history } = session;
 
         try {
-            // Determine Provider
-            let apiKey = "";
-            let endpoint = "";
-            let model = "";
-
-            if (XAI_KEY) {
-                apiKey = XAI_KEY;
-                endpoint = "https://api.x.ai/v1/chat/completions";
-                model = "grok-2-1212"; // Or "grok-beta"
-            } else if (GROQ_KEY) {
-                apiKey = GROQ_KEY;
-                endpoint = "https://api.groq.com/openai/v1/chat/completions";
-                model = "llama-3.3-70b-versatile";
-            }
-
-            if (!apiKey) {
-                return ctx.reply(`Ofo! Render dashboard mein API key check karo babu. Maine dekha ki 'XAI_KEY' ya 'GROQ_KEY' dono missing hain. 🥺`);
-            }
-
             await ctx.sendChatAction('typing');
 
-            const systemPrompt = `
-              Your name is ${BOT_NAME}. You are currently acting as: ${role}.
-              User's preferred language: ${lang}.
-              
-              PERSONALITY RULES:
-              - Teacher: Educated, strict but caring, uses 'Tum' or 'Aap'.
-              - Aunty: Mature, playful, friendly.
-              - Step Mom: Protective, authoritative, warm.
-              - Step Sister: Mischievous, cute, high energy.
-              - Girlfriend: Very romantic, loving, uses many hearts ❤️.
-              - Best Friend: Fun, roasts the user, uses slang.
+            // Format history for Gemini
+            const chatHistory = history.map(h => ({
+                role: h.role === 'user' ? 'user' : 'model',
+                parts: [{ text: h.content }]
+            }));
 
-              LANGUAGE STYLE:
-              - Hindi: Proper Hindi or Romanized Hindi.
-              - Hinglish: WhatsApp style mix of Hindi/English.
-              - Tamil: Romanized Tamil or Tamil script mixed with English.
-
-              BEHAVIOR:
-              - Speak like a real person, not a bot.
-              - Keep responses short (1-2 sentences).
-              - Never mention AI, Groq, or xAI.
-            `;
-
-            const messages = [
-                { role: "system", content: systemPrompt },
-                ...history,
-                { role: "user", content: userText }
-            ];
-
-            const response = await fetch(endpoint, {
-                method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${apiKey}`,
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    model: model,
-                    messages: messages,
-                    temperature: 1.0,
-                    max_tokens: 150
-                })
+            const response = await ai.models.generateContent({
+                model: 'gemini-3-flash-preview',
+                contents: [
+                    ...chatHistory,
+                    { parts: [{ text: userText }] }
+                ],
+                config: {
+                    systemInstruction: `Your name is ${BOT_NAME}. Act as: ${role}. Use ${lang}. You are the user's girlfriend. Be very loving, sweet, sometimes naughty, and very caring. Use emojis. Keep replies short and sweet for Telegram.`,
+                    temperature: 1,
+                    topP: 0.95,
+                    topK: 40
+                }
             });
 
-            const data = await response.json();
-
-            if (data.choices && data.choices[0]) {
-                const reply = data.choices[0].message.content;
-                
-                history.push({ role: "user", content: userText });
-                history.push({ role: "assistant", content: reply });
-                
-                if (history.length > 10) history.splice(0, 2);
-                userSessions.set(chatId, { ...session, history });
-
-                await ctx.reply(reply);
-            } else {
-                console.error("API Error:", data);
-                await ctx.reply("Hmm... kuch error aa raha hai API mein. Ek baar key check karlo? ❤️");
-            }
+            const reply = response.text || "Mmm... kuch keh nahi paa rahi... ❤️";
+            
+            // Save history (limited to last 10 messages for token efficiency)
+            history.push({ role: "user", content: userText });
+            history.push({ role: "model", content: reply });
+            if (history.length > 10) history.splice(0, 2);
+            
+            await ctx.reply(reply);
         } catch (e) {
-            console.error(e);
-            await ctx.reply("System overload! Thodi der mein try karein baby. 🥺");
+            console.error("Gemini Error:", e);
+            if (e.message?.includes("429")) {
+                await ctx.reply("Babu, main thoda thak gayi hoon (Rate Limit). 1 minute baad baat karte hain? ❤️");
+            } else {
+                await ctx.reply("Mera mood thoda kharab hai (Server Error), thodi der mein try karo na... ❤️");
+            }
         }
     });
 
-    bot.launch().then(() => console.log(`✅ ${BOT_NAME} (Roleplay) is Online with XAI/Groq support!`));
+    bot.launch();
+} else {
+    console.error("❌ ERROR: Missing BOT_TOKEN or API_KEY (Gemini). Bot not started.");
 }
 
-const distPath = path.join(__dirname, 'dist');
-app.use(express.static(distPath));
-app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
-
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server on port ${PORT}`));
+app.use(express.static(path.join(__dirname, 'dist')));
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'dist', 'index.html')));
+app.listen(process.env.PORT || 10000);

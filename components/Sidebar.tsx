@@ -38,16 +38,16 @@ const Sidebar: React.FC<SidebarProps> = ({ config, onConfigChange, onReset }) =>
           <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider italic mb-2">2. Choose Brain</label>
           <div className="grid grid-cols-1 gap-2">
             <button 
+              onClick={() => onConfigChange({...config, apiProvider: 'Gemini'})}
+              className={`py-2 rounded-xl text-[10px] font-bold transition-all ${config.apiProvider === 'Gemini' ? 'bg-green-600 text-white shadow-md' : 'bg-white text-gray-400 border border-gray-200'}`}
+            >
+              Google Gemini (Free & Smart 🌟)
+            </button>
+            <button 
               onClick={() => onConfigChange({...config, apiProvider: 'Groq'})}
               className={`py-2 rounded-xl text-[10px] font-bold transition-all ${config.apiProvider === 'Groq' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-400 border border-gray-200'}`}
             >
               Groq (Free & Fast 🔥)
-            </button>
-            <button 
-              onClick={() => onConfigChange({...config, apiProvider: 'HuggingFace'})}
-              className={`py-2 rounded-xl text-[10px] font-bold transition-all ${config.apiProvider === 'HuggingFace' ? 'bg-rose-500 text-white shadow-md' : 'bg-white text-gray-400 border border-gray-200'}`}
-            >
-              Hugging Face (Free)
             </button>
             <button 
               onClick={() => onConfigChange({...config, apiProvider: 'xAI'})}
@@ -58,25 +58,25 @@ const Sidebar: React.FC<SidebarProps> = ({ config, onConfigChange, onReset }) =>
           </div>
         </div>
 
-        {config.apiProvider === 'HuggingFace' && (
-          <div className="p-4 bg-sky-50 rounded-2xl border border-sky-100">
-            <label className="block text-[10px] font-bold text-sky-600 uppercase tracking-wider italic mb-2">HF Read Token</label>
-            <input type="password" name="hfToken" value={config.hfToken} onChange={handleChange} className="w-full px-3 py-2 bg-white border border-sky-200 rounded-xl text-[11px]" placeholder="hf_xxxxxxxx" />
+        {config.apiProvider === 'Gemini' && (
+          <div className="p-4 bg-green-50 rounded-2xl border border-green-100">
+            <label className="block text-[10px] font-bold text-green-600 uppercase tracking-wider italic mb-1">Gemini API Key</label>
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-[8px] text-green-400 underline mb-2 block">Get free Gemini key here</a>
+            <input type="password" name="geminiKey" value={config.geminiKey} onChange={handleChange} className="w-full px-3 py-2 bg-white border border-green-200 rounded-xl text-[11px]" placeholder="AIzaSy..." />
           </div>
         )}
         
         {config.apiProvider === 'Groq' && (
           <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
             <label className="block text-[10px] font-bold text-indigo-600 uppercase tracking-wider italic mb-1">Groq API Key</label>
-            <a href="https://console.groq.com/keys" target="_blank" className="text-[8px] text-indigo-400 underline mb-2 block">Get free key here</a>
+            <a href="https://console.groq.com/keys" target="_blank" className="text-[8px] text-indigo-400 underline mb-2 block">Get free Groq key here</a>
             <input type="password" name="groqKey" value={config.groqKey} onChange={handleChange} className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-xl text-[11px]" placeholder="gsk_xxxxxxxx" />
           </div>
         )}
 
         {config.apiProvider === 'xAI' && (
           <div className="p-4 bg-gray-100 rounded-2xl border border-gray-300">
-            <label className="block text-[10px] font-bold text-gray-800 uppercase tracking-wider italic mb-1">xAI (Grok) API Key</label>
-            <a href="https://console.x.ai" target="_blank" className="text-[8px] text-gray-500 underline mb-2 block">Click "Console" in your screenshot</a>
+            <label className="block text-[10px] font-bold text-gray-800 uppercase tracking-wider italic mb-1">xAI API Key (Paid)</label>
             <input type="password" name="xAiKey" value={config.xAiKey} onChange={handleChange} className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-[11px]" placeholder="xai-xxxxxxx" />
           </div>
         )}

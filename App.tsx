@@ -53,10 +53,8 @@ const App: React.FC = () => {
 
   const envVars = [
     { key: "TELEGRAM_TOKEN", value: config.telegramToken || "Required" },
-    { key: "API_PROVIDER", value: config.apiProvider },
-    { key: config.apiProvider === 'xAI' ? "XAI_KEY" : (config.apiProvider === 'Groq' ? "GROQ_KEY" : "HF_TOKEN"), value: config.apiProvider === 'xAI' ? config.xAiKey : (config.apiProvider === 'Groq' ? config.groqKey : config.hfToken) },
-    { key: "BOT_NAME", value: config.name },
-    { key: "PERSONALITY", value: config.personality }
+    { key: "API_KEY", value: config.geminiKey || "Paste Gemini Key Here" },
+    { key: "BOT_NAME", value: config.name }
   ];
 
   return (
@@ -72,15 +70,15 @@ const App: React.FC = () => {
           <div className="flex flex-col">
              <h2 className="text-xl font-bold text-gray-800 italic fancy-font">SoulMate Studio</h2>
              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-               Simulator Brain: <span className={config.apiProvider === 'xAI' ? 'text-black' : (config.apiProvider === 'Groq' ? 'text-indigo-500' : 'text-rose-500')}>{config.apiProvider}</span>
+               Platform: <span className="text-rose-500 font-black">Telegram Bot Builder</span>
              </p>
           </div>
           
           <button 
             onClick={() => setShowDeployModal(true)}
-            className="bg-gray-900 text-white px-5 py-2.5 rounded-2xl font-bold text-xs flex items-center gap-2 hover:bg-black transition-all shadow-lg"
+            className="bg-gray-900 text-white px-5 py-2.5 rounded-2xl font-bold text-xs flex items-center gap-2 hover:bg-black transition-all shadow-lg border border-white/10"
           >
-            <i className="fas fa-rocket text-rose-400"></i> DEPLOY ON RENDER
+            <i className="fas fa-cloud-upload-alt text-rose-400"></i> GET RENDER CONFIG
           </button>
         </div>
 
@@ -92,47 +90,50 @@ const App: React.FC = () => {
             botName={config.name}
           />
         </div>
-
-        <div className="max-w-4xl w-full mx-auto mt-4 px-4 py-3 bg-white border border-rose-100 rounded-2xl flex items-center justify-between shadow-sm">
-           <div className="flex items-center gap-3">
-             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-             <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Simulator is Active</p>
-           </div>
-           <p className="text-[10px] text-rose-400 font-medium italic">Make sure to select '{config.apiProvider}' brain above.</p>
-        </div>
       </main>
 
       {showDeployModal && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden">
-            <div className="p-8 bg-gradient-to-r from-indigo-600 to-rose-700 text-white flex justify-between items-center">
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="p-8 bg-black text-white flex justify-between items-center">
               <div>
-                <h3 className="text-2xl font-bold italic fancy-font">Final Deployment</h3>
-                <p className="text-xs opacity-80 mt-1">Render Dashboard par ye Settings karein:</p>
+                <h3 className="text-2xl font-bold italic fancy-font">Render Environment Variables</h3>
+                <p className="text-[10px] opacity-60 uppercase tracking-widest mt-1">Copy paste into Render Dashboard</p>
               </div>
               <button onClick={() => setShowDeployModal(false)} className="bg-white/10 p-2 rounded-full hover:bg-white/20"><i className="fas fa-times"></i></button>
             </div>
             
-            <div className="p-8 space-y-6 overflow-y-auto max-h-[70vh]">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-8 space-y-6 overflow-y-auto max-h-[60vh]">
+              <div className="grid grid-cols-1 gap-3">
                 {envVars.map(ev => (
-                  <div key={ev.key} className="p-3 bg-gray-50 border border-gray-100 rounded-2xl">
-                    <p className="text-[8px] font-bold text-gray-400 uppercase">{ev.key}</p>
-                    <p className="text-[10px] font-mono text-gray-800 truncate">{ev.value || "MISSING!"}</p>
+                  <div key={ev.key} className="flex items-center justify-between p-4 bg-gray-50 border border-gray-100 rounded-2xl group hover:border-rose-200 transition-colors">
+                    <div>
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">{ev.key}</p>
+                      <p className="text-xs font-mono text-gray-800 break-all pr-4">{ev.value}</p>
+                    </div>
+                    <button 
+                      onClick={() => navigator.clipboard.writeText(ev.value)}
+                      className="text-gray-400 hover:text-rose-500 p-2"
+                    >
+                      <i className="far fa-copy"></i>
+                    </button>
                   </div>
                 ))}
               </div>
 
-              <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 text-[11px] text-blue-700 leading-relaxed">
-                <p className="font-bold mb-1">⚠️ Important Step:</p>
-                <p>Render par jaakar <strong>Environment Variables</strong> mein <code>API_PROVIDER</code> ko <code>xAI</code> set karein aur <code>XAI_KEY</code> mein apni key daalein. Tabhi aapka Telegram bot Grok use karega.</p>
+              <div className="p-5 bg-green-50 rounded-3xl border border-green-100">
+                <p className="text-xs text-green-800 leading-relaxed">
+                  ✅ <strong>PRO TIP:</strong> Gemini API is free! Get your key from <a href="https://aistudio.google.com/" target="_blank" className="font-bold underline">Google AI Studio</a>. Don't use xAI or Groq if you want a zero-cost solution.
+                </p>
               </div>
-
+            </div>
+            
+            <div className="p-6 bg-gray-50 border-t border-gray-100">
               <button 
                 onClick={() => setShowDeployModal(false)}
-                className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold text-sm shadow-lg"
+                className="w-full py-4 bg-rose-600 text-white rounded-2xl font-bold text-sm shadow-xl shadow-rose-200 hover:bg-rose-700 transition-all"
               >
-                GOT IT! DONE ❤️
+                GOT IT! ❤️
               </button>
             </div>
           </div>
