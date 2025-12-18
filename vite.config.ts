@@ -5,17 +5,11 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   define: {
-    'process.env.API_KEY': JSON.stringify(process.env.API_KEY),
-    'process.env.TELEGRAM_BOT_TOKEN': JSON.stringify(process.env.TELEGRAM_BOT_TOKEN),
-    'process.env.HF_TOKEN': JSON.stringify(process.env.HF_TOKEN)
+    'process.env': {}
   },
   build: {
     outDir: 'dist',
-    rollupOptions: {
-      input: {
-        main: './index.html'
-      }
-    }
+    emptyOutDir: true
   },
   server: {
     port: 3000

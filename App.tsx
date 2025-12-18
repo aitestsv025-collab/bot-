@@ -52,8 +52,8 @@ const App: React.FC = () => {
   };
 
   const envVars = [
-    { key: "TELEGRAM_TOKEN", value: config.telegramToken || "Aapka Bot Token" },
-    { key: "HF_TOKEN", value: config.hfToken || "Aapka HF Token" },
+    { key: "TELEGRAM_TOKEN", value: config.telegramToken || "Required" },
+    { key: "HF_TOKEN", value: config.hfToken || "Required" },
     { key: "BOT_NAME", value: config.name },
     { key: "PERSONALITY", value: config.personality }
   ];
@@ -101,7 +101,7 @@ const App: React.FC = () => {
 
       {showDeployModal && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-200">
+          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden">
             <div className="p-8 bg-gradient-to-r from-rose-600 to-rose-700 text-white flex justify-between items-center">
               <div>
                 <h3 className="text-2xl font-bold italic fancy-font">Render Settings Fix</h3>
@@ -113,15 +113,12 @@ const App: React.FC = () => {
             <div className="p-8 space-y-6 overflow-y-auto max-h-[70vh]">
               <div className="bg-rose-50 p-6 rounded-3xl border-2 border-rose-100 space-y-4">
                 <h4 className="font-bold text-rose-700 text-sm flex items-center gap-2">
-                  <i className="fas fa-exclamation-triangle"></i> FIX MODULE NOT FOUND ERROR:
+                  <i className="fas fa-exclamation-triangle"></i> FIX BUILD ERROR:
                 </h4>
-                <p className="text-[11px] text-gray-600 leading-relaxed">
-                  Aapka error isliye aa raha hai kyunki Render <b>src/server.js</b> dhund raha hai. Use badal kar <b>server.js</b> karein:
-                </p>
                 <div className="space-y-2">
                   <div className="flex justify-between text-[10px] font-mono bg-white p-3 rounded-xl border border-rose-200">
                     <span className="text-gray-400">Root Directory:</span>
-                    <span className="text-rose-600 font-bold italic">(Khali chhod dein / Blank)</span>
+                    <span className="text-rose-600 font-bold italic">(Khali chhod dein / Leave Blank)</span>
                   </div>
                   <div className="flex justify-between text-[10px] font-mono bg-white p-3 rounded-xl border border-rose-200">
                     <span className="text-gray-400">Start Command:</span>
@@ -139,12 +136,12 @@ const App: React.FC = () => {
                 ))}
               </div>
 
-              <div className="bg-blue-50 p-5 rounded-3xl border border-blue-100">
-                 <h4 className="font-bold text-blue-800 text-xs mb-2">Final Step:</h4>
-                 <p className="text-[10px] text-gray-600">
-                   Ye changes karne ke baad Render dashboard mein <b>"Manual Deploy" > "Clear Cache and Deploy"</b> par click karein.
-                 </p>
-              </div>
+              <button 
+                onClick={() => setShowDeployModal(false)}
+                className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold text-sm shadow-lg"
+              >
+                THEEK HAI, AB DEPLOY KARTE HAIN!
+              </button>
             </div>
           </div>
         </div>
