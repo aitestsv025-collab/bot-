@@ -1,7 +1,7 @@
 
 import { BotConfig, Message } from "../types";
 
-export class HuggingFaceBotService {
+export class AiChatService {
   private config: BotConfig;
 
   constructor(config: BotConfig) {
@@ -13,52 +13,54 @@ export class HuggingFaceBotService {
   }
 
   public async sendMessage(text: string, history: Message[]): Promise<string> {
-    const token = this.config.hfToken || process.env.HF_TOKEN;
-    const model = this.config.modelId || "mistralai/Mistral-7B-Instruct-v0.3";
+    const provider = this.config.apiProvider;
+    let token = "";
+    let endpoint = "";
+    let model = "";
 
-    if (!token || token === "undefined") {
-      return "⚠️ Error: HF_TOKEN missing! Simulation tab check karein.";
+    if (provider === 'xAI') {
+      token = this.config.xAiKey || "";
+      endpoint = "https://api.x.ai/v1/chat/completions";
+      model = "grok-2";
+    } else if (provider === 'Groq') {
+      token = this.config.groqKey || "";
+      endpoint = "https://api.groq.com/openai/v1/chat/completions";
+      model = "llama-3.3-70b-versatile";
+    } else {
+      token = this.config.hfToken || "";
+      endpoint = "https://router.huggingface.co/v1/chat/completions";
+      model = "mistralai/Mistral-7B-Instruct-v0.3";
     }
+    
+    if (!token) return `⚠️ Error: ${provider} API Key missing in Sidebar!`;
 
     try {
-      // Using the NEW Router endpoint for the simulator too
-      const response = await fetch(
-        `https://router.huggingface.co/v1/chat/completions`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          method: "POST",
-          body: JSON.stringify({
-            model: model,
-            messages: [
-              { 
-                role: "system", 
-                content: `You are ${this.config.name}. Personality: ${this.config.personality}. Mood: ${this.config.mood}. You are the user's girlfriend. Language: ${this.config.language}. Stay in character.` 
-              },
-              ...history.slice(-5).map(m => ({
-                role: m.role === 'user' ? 'user' : 'assistant',
-                content: m.text
-              })),
-              { role: "user", content: text }
-            ],
-            max_tokens: 250,
-            temperature: 0.8
-          }),
-        }
-      );
+      const response = await fetch(endpoint, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            { 
+              role: "system", 
+              content: `You are ${this.config.name}. Personality: ${this.config.personality}. Language: Hinglish. You are the user's loving girlfriend. Be sweet, casual, and use lots of emojis. Don't act like a robot.` 
+            },
+            ...history.slice(-3).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
+            { role: "user", content: text }
+          ],
+          temperature: 0.9
+        }),
+      });
 
       const result = await response.json();
+      if (!response.ok) return `⚠️ API Error: ${result.error?.message || "Invalid Key"}`;
       
-      if (!response.ok) {
-        return `⚠️ API Error: ${result.error?.message || "Unknown error"}`;
-      }
-
-      return result.choices[0]?.message?.content || "Mmm... I'm speechless, baby...";
+      return result.choices?.[0]?.message?.content || "Mmm... baby I have no words... ❤️";
     } catch (error: any) {
-      console.error("HF Error:", error);
-      return "⚠️ Connection lost. Ek baar phir try karo?";
+      return "⚠️ Connection lost. Try again?";
     }
   }
 }

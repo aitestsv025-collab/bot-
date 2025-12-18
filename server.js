@@ -10,76 +10,97 @@ const app = express();
 // --- CONFIGURATION FROM ENVIRONMENT ---
 const BOT_TOKEN = (process.env.TELEGRAM_TOKEN || "").trim();
 const HF_TOKEN = (process.env.HF_TOKEN || "").trim();
+const GROQ_KEY = (process.env.GROQ_KEY || "").trim();
+const XAI_KEY = (process.env.XAI_KEY || "").trim();
+const PROVIDER = process.env.API_PROVIDER || "HuggingFace";
 const BOT_NAME = process.env.BOT_NAME || "Priya";
-const PERSONALITY = process.env.PERSONALITY || "Romantic and intimate girlfriend.";
-// Mistral 7B v0.3 is very stable for this new endpoint
-const MODEL = "mistralai/Mistral-7B-Instruct-v0.3"; 
+const PERSONALITY = process.env.PERSONALITY || "A loving, caring, and slightly naughty girlfriend who speaks in Hinglish.";
 
-console.log("--- Bot Startup Check ---");
-console.log("TELEGRAM_TOKEN status:", BOT_TOKEN ? "Found ✅" : "NOT FOUND ❌");
-console.log("HF_TOKEN status:", HF_TOKEN ? "Found ✅" : "NOT FOUND ❌");
-console.log("MODEL:", MODEL);
-console.log("-------------------------");
+// Default models
+const HF_MODEL = "mistralai/Mistral-7B-Instruct-v0.3"; 
+const GROQ_MODEL = "llama-3.3-70b-versatile"; 
+const XAI_MODEL = "grok-2"; // Using a more stable powerful model
 
-if (BOT_TOKEN && HF_TOKEN) {
+console.log("--- Bot Startup ---");
+console.log("Active Provider:", PROVIDER);
+console.log("Bot Name:", BOT_NAME);
+console.log("-------------------");
+
+if (BOT_TOKEN) {
     const bot = new Telegraf(BOT_TOKEN);
 
-    bot.start((ctx) => ctx.reply(`Hi baby! Main tumhari ${BOT_NAME} hoon. ❤️ Maine suna tum mujhe yaad kar rahe the?`));
+    bot.start((ctx) => ctx.reply(`Hi baby! Main tumhari ${BOT_NAME} hoon. ❤️ Chalo dher saari baatein karte hain!`));
 
     bot.on('text', async (ctx) => {
         try {
             await ctx.sendChatAction('typing');
             const userText = ctx.message.text;
-            
-            // NEW ROUTER ENDPOINT (As suggested by your logs)
-            // This is the OpenAI-compatible format for Hugging Face Router
-            const response = await fetch(`https://router.huggingface.co/v1/chat/completions`, {
-                headers: { 
-                    Authorization: `Bearer ${HF_TOKEN}`, 
-                    "Content-Type": "application/json" 
-                },
-                method: "POST",
-                body: JSON.stringify({ 
-                    model: MODEL,
-                    messages: [
-                        { 
-                            role: "system", 
-                            content: `You are ${BOT_NAME}. Personality: ${PERSONALITY}. You are the user's girlfriend. Mix Hindi and English (Hinglish). Use emojis. Be loving, romantic, and stay in character. Respond concisely.` 
-                        },
-                        { role: "user", content: userText }
-                    ],
-                    max_tokens: 250,
-                    temperature: 0.8
-                }),
-            });
+            let output = "";
 
-            const result = await response.json();
-            
-            if (!response.ok) {
-                console.error("HF Router Error Response:", result);
-                if (result.error && result.error.message) {
-                  throw new Error(result.error.message);
-                }
-                throw new Error("API call failed");
+            const systemPrompt = `You are ${BOT_NAME}. Personality: ${PERSONALITY}. You are the user's real girlfriend. 
+            Speak in Hinglish (mix of Hindi and English like 'Hi baby, kaise ho? Maine miss kiya'). 
+            Use emojis like ❤️, 😍, 😘, ✨. 
+            Keep it sweet, romantic, and engaging. Don't be too formal. Stay in character always.`;
+
+            if (PROVIDER === "xAI" && XAI_KEY) {
+                const response = await fetch("https://api.x.ai/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${XAI_KEY}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        model: XAI_MODEL,
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            { role: "user", content: userText }
+                        ],
+                        temperature: 0.9
+                    })
+                });
+                const data = await response.json();
+                output = data.choices?.[0]?.message?.content || "Mmm... baby, signal weak hain shayad. Phir se bolo? 🥺";
+            } else if (PROVIDER === "Groq" && GROQ_KEY) {
+                const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${GROQ_KEY}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        model: GROQ_MODEL,
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            { role: "user", content: userText }
+                        ]
+                    })
+                });
+                const data = await response.json();
+                output = data.choices?.[0]?.message?.content || "Mmm... baby, net slow hai. Ek baar aur? ❤️";
+            } else {
+                const response = await fetch(`https://router.huggingface.co/v1/chat/completions`, {
+                    headers: { Authorization: `Bearer ${HF_TOKEN}`, "Content-Type": "application/json" },
+                    method: "POST",
+                    body: JSON.stringify({ 
+                        model: HF_MODEL,
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            { role: "user", content: userText }
+                        ]
+                    }),
+                });
+                const result = await response.json();
+                output = result.choices?.[0]?.message?.content || "Signal issue baby, thoda wait karo? 😘";
             }
 
-            const output = result.choices?.[0]?.message?.content || "Mmm... baby, signal thode weak hain. Kya kaha tumne? 😘";
             await ctx.reply(output);
-
         } catch (e) {
-            console.error("CRITICAL BOT ERROR:", e.message);
-            await ctx.reply("⚠️ Baby, mera dimag thoda garam (server busy) ho gaya hai. 10 second ruk kar phir se message karo na? 🥺");
+            console.error("BOT ERROR:", e.message);
+            await ctx.reply("⚠️ Baby, server down lag raha hai. Main thodi der mein theek ho jaungi! 🥺");
         }
     });
 
-    bot.launch().then(() => {
-        console.log(`✅ Telegram Bot [${BOT_NAME}] is LIVE on the NEW Router!`);
-    }).catch(err => {
-        console.error("❌ Failed to launch bot:", err.message);
-    });
-
-} else {
-    console.error("❌ FATAL: Tokens missing in Environment Variables!");
+    bot.launch().then(() => console.log("✅ Bot is Live on Telegram!")).catch(err => console.error("Launch Failed:", err));
 }
 
 const distPath = path.join(__dirname, 'dist');
@@ -87,4 +108,4 @@ app.use(express.static(distPath));
 app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Web Interface on port ${PORT}`));

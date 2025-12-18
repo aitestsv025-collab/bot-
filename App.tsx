@@ -3,23 +3,23 @@ import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatUI from './components/ChatUI';
 import { Message, BotConfig, DEFAULT_CONFIG, Role } from './types';
-import { HuggingFaceBotService } from './services/hfService';
+import { AiChatService } from './services/hfService';
 
 const App: React.FC = () => {
   const [config, setConfig] = useState<BotConfig>(DEFAULT_CONFIG);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [showDeployModal, setShowDeployModal] = useState(false);
-  const hfServiceRef = useRef<HuggingFaceBotService | null>(null);
+  const aiServiceRef = useRef<AiChatService | null>(null);
 
   useEffect(() => {
-    hfServiceRef.current = new HuggingFaceBotService(config);
+    aiServiceRef.current = new AiChatService(config);
   }, []);
 
   const handleConfigChange = (newConfig: BotConfig) => {
     setConfig(newConfig);
-    if (hfServiceRef.current) {
-       hfServiceRef.current.updateConfig(newConfig);
+    if (aiServiceRef.current) {
+       aiServiceRef.current.updateConfig(newConfig);
     }
   };
 
@@ -38,8 +38,8 @@ const App: React.FC = () => {
     setMessages(prev => [...prev, userMsg]);
     setIsTyping(true);
 
-    if (hfServiceRef.current) {
-      const responseText = await hfServiceRef.current.sendMessage(text, [...messages, userMsg]);
+    if (aiServiceRef.current) {
+      const responseText = await aiServiceRef.current.sendMessage(text, [...messages, userMsg]);
       const botMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: Role.BOT,
@@ -53,7 +53,8 @@ const App: React.FC = () => {
 
   const envVars = [
     { key: "TELEGRAM_TOKEN", value: config.telegramToken || "Required" },
-    { key: "HF_TOKEN", value: config.hfToken || "Required" },
+    { key: "API_PROVIDER", value: config.apiProvider },
+    { key: config.apiProvider === 'Groq' ? "GROQ_KEY" : "HF_TOKEN", value: config.apiProvider === 'Groq' ? (config.groqKey || "Required") : (config.hfToken || "Required") },
     { key: "BOT_NAME", value: config.name },
     { key: "PERSONALITY", value: config.personality }
   ];
@@ -70,14 +71,16 @@ const App: React.FC = () => {
         <div className="max-w-4xl w-full mx-auto mb-6 flex items-center justify-between">
           <div className="flex flex-col">
              <h2 className="text-xl font-bold text-gray-800 italic fancy-font">SoulMate Studio</h2>
-             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Bot Status: {config.telegramToken ? 'Ready' : 'Configure'}</p>
+             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+               Provider: <span className={config.apiProvider === 'Groq' ? 'text-indigo-500' : 'text-rose-500'}>{config.apiProvider}</span>
+             </p>
           </div>
           
           <button 
             onClick={() => setShowDeployModal(true)}
             className="bg-gray-900 text-white px-5 py-2.5 rounded-2xl font-bold text-xs flex items-center gap-2 hover:bg-black transition-all shadow-lg"
           >
-            <i className="fas fa-tools text-rose-400"></i> FIX RENDER ERRORS
+            <i className="fas fa-rocket text-rose-400"></i> DEPLOY ON RENDER
           </button>
         </div>
 
@@ -93,41 +96,25 @@ const App: React.FC = () => {
         <div className="max-w-4xl w-full mx-auto mt-4 px-4 py-3 bg-white border border-rose-100 rounded-2xl flex items-center justify-between shadow-sm">
            <div className="flex items-center gap-3">
              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-             <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Simulator is running locally</p>
+             <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Simulator is Active</p>
            </div>
-           <p className="text-[10px] text-rose-400 font-medium italic">Make sure to deploy on Render for Telegram live</p>
+           <p className="text-[10px] text-rose-400 font-medium italic">Groq is recommended for faster responses</p>
         </div>
       </main>
 
       {showDeployModal && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden">
-            <div className="p-8 bg-gradient-to-r from-rose-600 to-rose-700 text-white flex justify-between items-center">
+            <div className="p-8 bg-gradient-to-r from-indigo-600 to-rose-700 text-white flex justify-between items-center">
               <div>
-                <h3 className="text-2xl font-bold italic fancy-font">Render Settings Fix</h3>
-                <p className="text-xs opacity-80 mt-1">Aapke errors ko theek karne ke liye ye check karein:</p>
+                <h3 className="text-2xl font-bold italic fancy-font">Final Deployment</h3>
+                <p className="text-xs opacity-80 mt-1">Render par ye Environment Variables set karein:</p>
               </div>
               <button onClick={() => setShowDeployModal(false)} className="bg-white/10 p-2 rounded-full hover:bg-white/20"><i className="fas fa-times"></i></button>
             </div>
             
             <div className="p-8 space-y-6 overflow-y-auto max-h-[70vh]">
-              <div className="bg-rose-50 p-6 rounded-3xl border-2 border-rose-100 space-y-4">
-                <h4 className="font-bold text-rose-700 text-sm flex items-center gap-2">
-                  <i className="fas fa-exclamation-triangle"></i> FIX BUILD ERROR:
-                </h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-[10px] font-mono bg-white p-3 rounded-xl border border-rose-200">
-                    <span className="text-gray-400">Root Directory:</span>
-                    <span className="text-rose-600 font-bold italic">(Khali chhod dein / Leave Blank)</span>
-                  </div>
-                  <div className="flex justify-between text-[10px] font-mono bg-white p-3 rounded-xl border border-rose-200">
-                    <span className="text-gray-400">Start Command:</span>
-                    <span className="text-rose-600 font-bold">node server.js</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {envVars.map(ev => (
                   <div key={ev.key} className="p-3 bg-gray-50 border border-gray-100 rounded-2xl">
                     <p className="text-[8px] font-bold text-gray-400 uppercase">{ev.key}</p>
@@ -136,11 +123,15 @@ const App: React.FC = () => {
                 ))}
               </div>
 
+              <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 text-[10px] text-amber-700">
+                <p><strong>Note:</strong> Agar aap Groq use kar rahe hain, toh <code>API_PROVIDER</code> ko <code>Groq</code> hi likhna Render par bhi.</p>
+              </div>
+
               <button 
                 onClick={() => setShowDeployModal(false)}
                 className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold text-sm shadow-lg"
               >
-                THEEK HAI, AB DEPLOY KARTE HAIN!
+                DONE! AB CHAT KARTE HAIN ❤️
               </button>
             </div>
           </div>

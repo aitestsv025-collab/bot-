@@ -11,11 +11,16 @@ export interface Message {
   timestamp: Date;
 }
 
+export type ApiProvider = 'HuggingFace' | 'Groq' | 'xAI';
+
 export interface BotConfig {
   name: string;
   personality: string;
   telegramToken: string;
   hfToken: string;
+  groqKey: string;
+  xAiKey: string; // New field for xAI
+  apiProvider: ApiProvider;
   modelId: string;
   mood: 'Romantic' | 'Funny' | 'Supportive' | 'Playful' | 'Naughty';
   language: 'Hindi' | 'English' | 'Hinglish';
@@ -26,7 +31,10 @@ export const DEFAULT_CONFIG: BotConfig = {
   personality: "Very open-minded, loving, and likes to have deep and intimate conversations. No filters.",
   telegramToken: "",
   hfToken: "",
-  modelId: "NousResearch/Nous-Hermes-2-Mistral-7B-DPO",
+  groqKey: "",
+  xAiKey: "",
+  apiProvider: 'HuggingFace',
+  modelId: "mistralai/Mistral-7B-Instruct-v0.3",
   mood: "Romantic",
   language: "Hinglish"
 };
