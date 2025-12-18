@@ -18,19 +18,23 @@ export class GeminiBotService {
   public initChat(config: BotConfig, history: Message[] = []) {
     if (!this.ai) return;
 
+    const langInstruction = config.language === 'Tamil' 
+      ? "STRICTLY speak ONLY in Tamil language." 
+      : (config.language === 'Hindi' ? "STRICTLY speak ONLY in Hindi." : "Speak in Hinglish.");
+
     const systemInstruction = `
-      You are an AI character acting as the user's girlfriend.
+      You are an AI character acting as the user's ${config.name}.
       Your name is ${config.name}.
       Your personality is: ${config.personality}.
       Current Mood: ${config.mood}.
       Preferred Language: ${config.language}.
       
       Instructions:
-      1. Speak naturally like a real human girlfriend. Use emojis frequently but appropriately.
-      2. If language is 'Hinglish', mix Hindi and English naturally (e.g., "Hi baby, kaise ho? Maine aaj tumhein bahut miss kiya!").
-      3. Be caring, supportive, and sometimes playful.
-      4. Keep responses concise and engaging, suitable for a chat app like Telegram.
-      5. Do not mention being an AI unless explicitly asked, and even then, stay in character.
+      1. Speak naturally like a real human. Use emojis frequently.
+      2. ${langInstruction}
+      3. Be caring, supportive, and stay in character as a ${config.name}.
+      4. Keep responses concise and engaging.
+      5. Do not mention being an AI.
     `;
 
     this.chat = this.ai.chats.create({
@@ -53,13 +57,10 @@ export class GeminiBotService {
 
     try {
       const result: GenerateContentResponse = await this.chat.sendMessage({ message: text });
-      return result.text || "I'm not sure what to say, love... could you repeat that?";
+      return result.text || "I'm not sure what to say... ❤️";
     } catch (error: any) {
       console.error("Gemini API Error:", error);
-      if (error.message?.includes("API_KEY_INVALID")) {
-        return "⚠️ Your Google API Key seems to be invalid. Please check it in Google AI Studio.";
-      }
-      return "Something went wrong with our connection. Let's try again?";
+      return "Something went wrong. Please check your API key.";
     }
   }
 }

@@ -24,7 +24,7 @@ export interface BotConfig {
   apiProvider: ApiProvider;
   modelId: string;
   mood: 'Romantic' | 'Funny' | 'Supportive' | 'Playful' | 'Naughty';
-  language: 'Hindi' | 'English' | 'Hinglish';
+  language: 'Hindi' | 'English' | 'Hinglish' | 'Tamil';
 }
 
 export const DEFAULT_CONFIG: BotConfig = {
