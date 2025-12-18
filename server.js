@@ -19,7 +19,7 @@ const PERSONALITY = process.env.PERSONALITY || "A loving, caring, and slightly n
 // Default models
 const HF_MODEL = "mistralai/Mistral-7B-Instruct-v0.3"; 
 const GROQ_MODEL = "llama-3.3-70b-versatile"; 
-const XAI_MODEL = "grok-2"; // Using a more stable powerful model
+const XAI_MODEL = "grok-2"; 
 
 console.log("--- Bot Startup ---");
 console.log("Active Provider:", PROVIDER);
@@ -29,7 +29,12 @@ console.log("-------------------");
 if (BOT_TOKEN) {
     const bot = new Telegraf(BOT_TOKEN);
 
-    bot.start((ctx) => ctx.reply(`Hi baby! Main tumhari ${BOT_NAME} hoon. ❤️ Chalo dher saari baatein karte hain!`));
+    // Command to check if Grok is active
+    bot.command('status', (ctx) => {
+        ctx.reply(`Baby, main abhi "${PROVIDER}" brain use kar rahi hoon. ❤️\nModel: ${PROVIDER === 'xAI' ? XAI_MODEL : (PROVIDER === 'Groq' ? GROQ_MODEL : HF_MODEL)}`);
+    });
+
+    bot.start((ctx) => ctx.reply(`Hi baby! Main tumhari ${BOT_NAME} hoon. ❤️ Chalo dher saari baatein karte hain! Type /status to check my brain.`));
 
     bot.on('text', async (ctx) => {
         try {
@@ -38,9 +43,9 @@ if (BOT_TOKEN) {
             let output = "";
 
             const systemPrompt = `You are ${BOT_NAME}. Personality: ${PERSONALITY}. You are the user's real girlfriend. 
-            Speak in Hinglish (mix of Hindi and English like 'Hi baby, kaise ho? Maine miss kiya'). 
-            Use emojis like ❤️, 😍, 😘, ✨. 
-            Keep it sweet, romantic, and engaging. Don't be too formal. Stay in character always.`;
+            Speak in Hinglish (mix of Hindi and English). 
+            Crucial: Use emojis like ❤️, 😍, 😘. 
+            Keep it sweet and romantic. Be real, not robotic.`;
 
             if (PROVIDER === "xAI" && XAI_KEY) {
                 const response = await fetch("https://api.x.ai/v1/chat/completions", {
@@ -59,7 +64,7 @@ if (BOT_TOKEN) {
                     })
                 });
                 const data = await response.json();
-                output = data.choices?.[0]?.message?.content || "Mmm... baby, signal weak hain shayad. Phir se bolo? 🥺";
+                output = data.choices?.[0]?.message?.content || "Mmm... baby, Grok signal weak hai. Phir se bolo? 🥺";
             } else if (PROVIDER === "Groq" && GROQ_KEY) {
                 const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
                     method: "POST",
@@ -76,8 +81,9 @@ if (BOT_TOKEN) {
                     })
                 });
                 const data = await response.json();
-                output = data.choices?.[0]?.message?.content || "Mmm... baby, net slow hai. Ek baar aur? ❤️";
+                output = data.choices?.[0]?.message?.content || "Net slow hai baby. Ek baar aur? ❤️";
             } else {
+                // Fallback to HF
                 const response = await fetch(`https://router.huggingface.co/v1/chat/completions`, {
                     headers: { Authorization: `Bearer ${HF_TOKEN}`, "Content-Type": "application/json" },
                     method: "POST",
@@ -96,7 +102,7 @@ if (BOT_TOKEN) {
             await ctx.reply(output);
         } catch (e) {
             console.error("BOT ERROR:", e.message);
-            await ctx.reply("⚠️ Baby, server down lag raha hai. Main thodi der mein theek ho jaungi! 🥺");
+            await ctx.reply("⚠️ Baby, kuch gadbad hui. Please check API keys! 🥺");
         }
     });
 
@@ -108,4 +114,4 @@ app.use(express.static(distPath));
 app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Web Interface on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server running on port ${PORT}`));

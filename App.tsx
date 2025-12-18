@@ -54,7 +54,7 @@ const App: React.FC = () => {
   const envVars = [
     { key: "TELEGRAM_TOKEN", value: config.telegramToken || "Required" },
     { key: "API_PROVIDER", value: config.apiProvider },
-    { key: config.apiProvider === 'Groq' ? "GROQ_KEY" : "HF_TOKEN", value: config.apiProvider === 'Groq' ? (config.groqKey || "Required") : (config.hfToken || "Required") },
+    { key: config.apiProvider === 'xAI' ? "XAI_KEY" : (config.apiProvider === 'Groq' ? "GROQ_KEY" : "HF_TOKEN"), value: config.apiProvider === 'xAI' ? config.xAiKey : (config.apiProvider === 'Groq' ? config.groqKey : config.hfToken) },
     { key: "BOT_NAME", value: config.name },
     { key: "PERSONALITY", value: config.personality }
   ];
@@ -72,7 +72,7 @@ const App: React.FC = () => {
           <div className="flex flex-col">
              <h2 className="text-xl font-bold text-gray-800 italic fancy-font">SoulMate Studio</h2>
              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-               Provider: <span className={config.apiProvider === 'Groq' ? 'text-indigo-500' : 'text-rose-500'}>{config.apiProvider}</span>
+               Simulator Brain: <span className={config.apiProvider === 'xAI' ? 'text-black' : (config.apiProvider === 'Groq' ? 'text-indigo-500' : 'text-rose-500')}>{config.apiProvider}</span>
              </p>
           </div>
           
@@ -98,7 +98,7 @@ const App: React.FC = () => {
              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Simulator is Active</p>
            </div>
-           <p className="text-[10px] text-rose-400 font-medium italic">Groq is recommended for faster responses</p>
+           <p className="text-[10px] text-rose-400 font-medium italic">Make sure to select '{config.apiProvider}' brain above.</p>
         </div>
       </main>
 
@@ -108,7 +108,7 @@ const App: React.FC = () => {
             <div className="p-8 bg-gradient-to-r from-indigo-600 to-rose-700 text-white flex justify-between items-center">
               <div>
                 <h3 className="text-2xl font-bold italic fancy-font">Final Deployment</h3>
-                <p className="text-xs opacity-80 mt-1">Render par ye Environment Variables set karein:</p>
+                <p className="text-xs opacity-80 mt-1">Render Dashboard par ye Settings karein:</p>
               </div>
               <button onClick={() => setShowDeployModal(false)} className="bg-white/10 p-2 rounded-full hover:bg-white/20"><i className="fas fa-times"></i></button>
             </div>
@@ -118,20 +118,21 @@ const App: React.FC = () => {
                 {envVars.map(ev => (
                   <div key={ev.key} className="p-3 bg-gray-50 border border-gray-100 rounded-2xl">
                     <p className="text-[8px] font-bold text-gray-400 uppercase">{ev.key}</p>
-                    <p className="text-[10px] font-mono text-gray-800 truncate">{ev.value}</p>
+                    <p className="text-[10px] font-mono text-gray-800 truncate">{ev.value || "MISSING!"}</p>
                   </div>
                 ))}
               </div>
 
-              <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 text-[10px] text-amber-700">
-                <p><strong>Note:</strong> Agar aap Groq use kar rahe hain, toh <code>API_PROVIDER</code> ko <code>Groq</code> hi likhna Render par bhi.</p>
+              <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 text-[11px] text-blue-700 leading-relaxed">
+                <p className="font-bold mb-1">⚠️ Important Step:</p>
+                <p>Render par jaakar <strong>Environment Variables</strong> mein <code>API_PROVIDER</code> ko <code>xAI</code> set karein aur <code>XAI_KEY</code> mein apni key daalein. Tabhi aapka Telegram bot Grok use karega.</p>
               </div>
 
               <button 
                 onClick={() => setShowDeployModal(false)}
                 className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold text-sm shadow-lg"
               >
-                DONE! AB CHAT KARTE HAIN ❤️
+                GOT IT! DONE ❤️
               </button>
             </div>
           </div>
