@@ -11,9 +11,18 @@ const app = express();
 // --- CONFIGURATION ---
 const BOT_TOKEN = (process.env.TELEGRAM_TOKEN || "").trim();
 const GEMINI_KEY = (process.env.API_KEY || "").trim(); 
-const BOT_NAME = process.env.BOT_NAME || "Malini";
 
+// Persistent Session Map (In-memory for now)
 const userSessions = new Map();
+
+const namePools = {
+    'Girlfriend': ['Riya', 'Sana', 'Ishani', 'Myra', 'Tanvi', 'Priya'],
+    'BestFriend': ['Sneha', 'Anjali', 'Kritika', 'Diya', 'Tanu'],
+    'Teacher': ['Ms. Sharma', 'Ms. Gupta', 'Aditi Ma\'am', 'Ms. Deshmukh', 'Neha Miss'],
+    'Aunty': ['Sunita Ji', 'Meena Ji', 'Kavita Aunty', 'Rajeshwari', 'Pushpa'],
+    'StepMom': ['Seema', 'Kiran', 'Rekha', 'Vandana', 'Anita'],
+    'StepSister': ['Ishita', 'Ananya', 'Jhanvi', 'Khushi', 'Navya']
+};
 
 const roleScenarios = {
     'Girlfriend': "It's a quiet evening. I'm waiting for you at our favorite spot.",
@@ -24,35 +33,34 @@ const roleScenarios = {
     'StepSister': "I'm in the balcony, listening to music. You just joined me."
 };
 
-// Role-based appearance mapping
 const roleAppearance = {
-    'Girlfriend': "a beautiful 18-19 year old Indian girl, wearing pretty casual clothes",
-    'BestFriend': "a cute 18-19 year old Indian girl, wearing trendy casual clothes",
-    'Teacher': "a professional 25 year old Indian woman, wearing a formal saree or office attire, intellectual look",
-    'Aunty': "a mature 35-40 year old Indian woman, wearing a traditional saree, graceful and homely look",
-    'StepMom': "a graceful 32-35 year old Indian woman, wearing elegant home clothes",
-    'StepSister': "a modern 20 year old Indian girl, wearing cool stylish clothes"
+    'Girlfriend': "a beautiful 18-19 year old Indian girl, wearing trendy casual clothes",
+    'BestFriend': "a cute 18-19 year old Indian girl, wearing simple college clothes",
+    'Teacher': "a professional 25 year old Indian woman, wearing a formal elegant saree and glasses, intellectual look",
+    'Aunty': "a mature 35-40 year old Indian woman, wearing a traditional heavy saree, graceful and homely look",
+    'StepMom': "a graceful 32-35 year old Indian woman, wearing elegant house clothes or a simple salwar kameez",
+    'StepSister': "a modern 20 year old Indian girl, wearing cool stylish western clothes"
 };
 
-// Helper to get strict language instructions
 function getLangInstruction(lang) {
-    const emojiRules = " Use frequent and expressive emojis in every sentence (like ❤️, ✨, 😊, 🌸, 🥰, 🥺).";
+    const emojiRules = " Use dher saare expressive emojis (❤️, ✨, 😊, 🌸, 🥰, 🥺, 😋).";
     switch(lang) {
-        case 'Hindi': return "STRICTLY use HINDI language only (Devanagari script). Do NOT use English words." + emojiRules;
-        case 'Tamil': return "STRICTLY use TAMIL language only (Tamil script). Do NOT use English words." + emojiRules;
-        case 'English': return "STRICTLY use ENGLISH language only. Do NOT use any Hindi or other language words." + emojiRules;
-        case 'Hinglish': return "Use HINGLISH (Hindi words written in Roman/English script). Mix of Hindi and English like common chats." + emojiRules;
+        case 'Hindi': return "STRICTLY use HINDI language only (Devanagari script). No English." + emojiRules;
+        case 'Tamil': return "STRICTLY use TAMIL language only. No English." + emojiRules;
+        case 'English': return "STRICTLY use ENGLISH language only." + emojiRules;
+        case 'Hinglish': return "Use HINGLISH (Hindi mixed with English in Roman script). Natural chat style." + emojiRules;
         default: return "Use English." + emojiRules;
     }
 }
 
-// Helper function to generate an image based on the context and role
-async function generateContextImage(ai, visualDescription, role) {
+async function generateContextImage(ai, visualDescription, role, characterName) {
     try {
-        const appearance = roleAppearance[role] || "a beautiful 23-year-old Indian girl";
+        const appearance = roleAppearance[role] || "a beautiful Indian girl";
+        const prompt = `A realistic high-quality cinematic photo of an Indian woman named ${characterName}. She is ${appearance}. Scene: ${visualDescription}. Natural lighting, detailed facial features, emotional expression, 4k resolution, bokeh background.`;
+        
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
-            contents: { parts: [{ text: `A high-quality, realistic cinematic photo of ${BOT_NAME}, who is ${appearance}. Scene: ${visualDescription}. Natural lighting, detailed facial expressions matching the mood, highly detailed 4k realistic photography.` }] },
+            contents: { parts: [{ text: prompt }] },
             config: { imageConfig: { aspectRatio: "1:1" } }
         });
         for (const part of response.candidates[0].content.parts) {
@@ -63,8 +71,6 @@ async function generateContextImage(ai, visualDescription, role) {
     }
     return null;
 }
-
-console.log(`--- ❤️ Malini Bot v19.0 (Role-Aware Visuals) ---`);
 
 app.get('/health', (req, res) => res.status(200).send('Bot is active.'));
 
@@ -80,8 +86,16 @@ if (BOT_TOKEN && GEMINI_KEY) {
     ];
 
     bot.start((ctx) => {
+        // Automatic Name Detection
+        const userName = ctx.from.first_name || "User";
+        
+        // Memory reset only happens on /start
         userSessions.delete(ctx.chat.id);
-        return ctx.reply(`Welcome! Select a role for ${BOT_NAME}:`, 
+        
+        // Temporarily store userName to be used when role is selected
+        userSessions.set(ctx.chat.id, { userName: userName, step: 'role_selection' });
+
+        return ctx.reply(`Namaste ${userName}! Welcome to SoulMate Studio! ❤️\n\nKaun sa character choose karna chahenge?`, 
             Markup.inlineKeyboard([
                 [Markup.button.callback('❤️ Girlfriend', 'role_Girlfriend'), Markup.button.callback('🤝 Best Friend', 'role_BestFriend')],
                 [Markup.button.callback('👩‍🏫 Teacher', 'role_Teacher'), Markup.button.callback('💃 Aunty', 'role_Aunty')],
@@ -92,8 +106,21 @@ if (BOT_TOKEN && GEMINI_KEY) {
 
     bot.action(/role_(.+)/, (ctx) => {
         const selectedRole = ctx.match[1];
-        userSessions.set(ctx.chat.id, { role: selectedRole, lang: 'English', history: [] });
-        return ctx.editMessageText(`Select Language / Bhasha chunein:`, 
+        const session = userSessions.get(ctx.chat.id);
+        const userName = session?.userName || ctx.from.first_name || "User";
+        
+        const names = namePools[selectedRole];
+        const assignedName = names[Math.floor(Math.random() * names.length)];
+        
+        userSessions.set(ctx.chat.id, { 
+            role: selectedRole, 
+            name: assignedName,
+            userName: userName,
+            lang: 'Hinglish', 
+            history: [] 
+        });
+
+        return ctx.editMessageText(`${userName}, aapne ${assignedName} (${selectedRole}) ko choose kiya hai. ✨\n\nAb humari baat-cheet ki bhasha chunein:`, 
             Markup.inlineKeyboard([
                 [Markup.button.callback('🇬🇧 English', 'lang_English'), Markup.button.callback('🌍 Hinglish', 'lang_Hinglish')],
                 [Markup.button.callback('🇮🇳 Hindi', 'lang_Hindi'), Markup.button.callback('🪔 Tamil', 'lang_Tamil')]
@@ -103,32 +130,33 @@ if (BOT_TOKEN && GEMINI_KEY) {
 
     bot.action(/lang_(.+)/, async (ctx) => {
         const session = userSessions.get(ctx.chat.id);
-        const selectedLang = ctx.match[1];
-        if (session) session.lang = selectedLang;
+        if (!session) return ctx.reply("Please use /start again.");
         
-        const role = session?.role || 'Girlfriend';
+        const selectedLang = ctx.match[1];
+        session.lang = selectedLang;
+        
+        const { role, name, lang, userName } = session;
         const scenario = roleScenarios[role] || "We just met.";
         
-        await ctx.answerCbQuery("Starting scene...");
+        await ctx.answerCbQuery(`${name} is typing...`);
         await ctx.sendChatAction('upload_photo');
 
         try {
-            const languageInstruction = getLangInstruction(selectedLang);
-
+            const languageInstruction = getLangInstruction(lang);
             const introResponse = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: `Setting: ${scenario}. Introduce yourself as ${BOT_NAME}. Act as ${role}. 1 short line. Use emojis. NO FLIRTING.`,
+                contents: `Setting: ${scenario}. Introduce yourself as ${name} to ${userName}. Act as ${role}. 1 short line. Use emojis. Call them by their name.`,
                 config: {
-                    systemInstruction: `You are ${BOT_NAME}. Role: ${role}. ${languageInstruction} Keep it realistic, short, and use lots of emojis. Use *asterisks* for actions.`,
-                    temperature: 0.7,
+                    systemInstruction: `You are ${name}. Role: ${role}. Talking to user named ${userName}. ${languageInstruction} Never mention you are AI. Be immersive. Use *asterisks* for actions.`,
+                    temperature: 0.8,
                     safetySettings
                 }
             });
 
-            const introText = introResponse.text || "Hey! ❤️";
+            const introText = introResponse.text || `Hello ${userName}! I am ${name}. ❤️`;
             session.history.push({ role: "model", content: introText });
 
-            const imageData = await generateContextImage(ai, `${role} in the setting: ${scenario}. She looks natural and welcoming.`, role);
+            const imageData = await generateContextImage(ai, `Introducing herself in this setting: ${scenario}. Looking at ${userName} with a smile.`, role, name);
             
             await ctx.deleteMessage().catch(() => {});
             if (imageData) {
@@ -137,7 +165,7 @@ if (BOT_TOKEN && GEMINI_KEY) {
                 await ctx.reply(introText);
             }
         } catch (e) {
-            await ctx.reply(`Hi there. ❤️✨`);
+            await ctx.reply(`Hey ${userName}! I am ${name}. ❤️`);
         }
     });
 
@@ -145,17 +173,18 @@ if (BOT_TOKEN && GEMINI_KEY) {
         const chatId = ctx.chat.id;
         const userText = ctx.message.text;
 
-        if (!userSessions.has(chatId)) {
-            userSessions.set(chatId, { role: 'Girlfriend', lang: 'English', history: [] });
+        if (!userSessions.has(chatId) || userSessions.get(chatId).step === 'role_selection') {
+            return ctx.reply("Please start again with /start ❤️");
         }
 
         const session = userSessions.get(chatId);
-        const { role, lang, history } = session;
+        const { role, name, lang, history, userName } = session;
 
         try {
             await ctx.sendChatAction('upload_photo');
 
-            const chatHistory = history.map(h => ({
+            // Memory: history is preserved between messages
+            const chatHistoryForAI = history.map(h => ({
                 role: h.role === 'user' ? 'user' : 'model',
                 parts: [{ text: h.content }]
             }));
@@ -164,9 +193,9 @@ if (BOT_TOKEN && GEMINI_KEY) {
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: [...chatHistory, { parts: [{ text: userText }] }],
+                contents: [...chatHistoryForAI, { parts: [{ text: userText }] }],
                 config: {
-                    systemInstruction: `Name: ${BOT_NAME}. Role: ${role}. ${languageInstruction} Be highly expressive with emojis. Stay strictly in character. Response max 1-2 lines. Use *asterisks* for small actions like *smiling* or *looking away*.`,
+                    systemInstruction: `Name: ${name}. Role: ${role}. Talking to ${userName}. ${languageInstruction} Address ${userName} by their name occasionally. Always remember previous talk. Be very expressive with emojis. Max 1-2 lines. Use *asterisks* for small actions.`,
                     temperature: 0.9,
                     safetySettings
                 }
@@ -174,18 +203,21 @@ if (BOT_TOKEN && GEMINI_KEY) {
 
             const reply = response.text || "Mmm... ❤️";
             
-            // Generate visual description for image generation based on AI's own response
+            // Situation-aware image description
             const visualPromptResponse = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: `Based on this response: "${reply}", describe the girl's facial expression and immediate surroundings in 10 words for an image generator. Focus on her emotion.`,
+                contents: `Based on the reply "${reply}" to ${userName}, describe the girl's facial expression and location in 8 words for a photo.`,
             });
-            const visualDesc = visualPromptResponse.text || `${role} talking.`;
+            const visualDesc = visualPromptResponse.text || `${role} talking to ${userName}.`;
 
-            const imageData = await generateContextImage(ai, visualDesc, role);
+            const imageData = await generateContextImage(ai, visualDesc, role, name);
 
+            // Save to history
             history.push({ role: "user", content: userText });
             history.push({ role: "model", content: reply });
-            if (history.length > 10) history.splice(0, 2);
+            
+            // Limit history to approx last 40 messages
+            if (history.length > 40) history.splice(0, 2);
             
             if (imageData) {
                 await ctx.replyWithPhoto({ source: Buffer.from(imageData, 'base64') }, { caption: reply });
@@ -193,14 +225,11 @@ if (BOT_TOKEN && GEMINI_KEY) {
                 await ctx.reply(reply);
             }
         } catch (e) {
-            await ctx.reply("❤️✨");
+            await ctx.reply("Something went wrong, but I am still here... ❤️");
         }
     });
 
-    bot.launch().then(() => console.log(`✅ LIVE WITH ROLE-BASED AGES AND ATTIRE!`));
-    process.once('SIGINT', () => bot.stop('SIGINT'));
-    process.once('SIGTERM', () => bot.stop('SIGTERM'));
-
+    bot.launch().then(() => console.log(`✅ BOT IS LIVE WITH USER NAME DETECTION!`));
 } else {
     console.error("KEYS MISSING: Set TELEGRAM_TOKEN and API_KEY in Render Dashboard.");
 }
