@@ -52,9 +52,8 @@ const App: React.FC = () => {
   };
 
   const envVars = [
-    { key: "TELEGRAM_TOKEN", value: config.telegramToken || "Aapka Bot Token" },
-    { key: "API_KEY", value: config.geminiKey || "Aapki Gemini Key" },
-    { key: "BOT_NAME", value: config.name }
+    { key: "TELEGRAM_TOKEN", value: config.telegramToken || "Aapka BotFather Token" },
+    { key: "API_KEY", value: config.geminiKey || "Aapki Gemini API Key" }
   ];
 
   return (
@@ -78,7 +77,7 @@ const App: React.FC = () => {
             onClick={() => setShowDeployModal(true)}
             className="bg-gray-900 text-white px-5 py-2.5 rounded-2xl font-bold text-xs flex items-center gap-2 hover:bg-black transition-all shadow-lg border border-white/10"
           >
-            <i className="fas fa-cloud-upload-alt text-rose-400"></i> HOW TO KEEP LIVE?
+            <i className="fas fa-server text-green-400"></i> 24/7 FREE SETUP GUIDE
           </button>
         </div>
 
@@ -95,45 +94,58 @@ const App: React.FC = () => {
       {showDeployModal && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
-            <div className="p-8 bg-black text-white flex justify-between items-center">
+            <div className="p-8 bg-rose-600 text-white flex justify-between items-center">
               <div>
-                <h3 className="text-2xl font-bold italic fancy-font">Render Deployment Guide</h3>
-                <p className="text-[10px] opacity-60 uppercase tracking-widest mt-1">Bot ko 24/7 chalane ke liye</p>
+                <h3 className="text-2xl font-bold italic fancy-font">Render + UptimeRobot Setup</h3>
+                <p className="text-[10px] opacity-80 uppercase tracking-widest mt-1">Free Lifetime Hosting</p>
               </div>
               <button onClick={() => setShowDeployModal(false)} className="bg-white/10 p-2 rounded-full hover:bg-white/20"><i className="fas fa-times"></i></button>
             </div>
             
             <div className="p-8 space-y-6 overflow-y-auto max-h-[60vh]">
-              <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100">
-                <p className="text-sm text-rose-800 font-bold mb-2">Sahi tarika:</p>
-                <ol className="text-xs text-rose-700 space-y-2 list-decimal ml-4">
-                  <li>Render Dashboard pe jayein.</li>
-                  <li>Apne project ki <b>Settings</b> mein <b>Environment Variables</b> section dhundein.</li>
-                  <li>Niche diye gaye 3 Keys ko copy karke wahan "Add" karein.</li>
-                  <li>Save karein aur "Manual Deploy" par click karein.</li>
-                </ol>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3">
-                {envVars.map(ev => (
-                  <div key={ev.key} className="flex items-center justify-between p-4 bg-gray-50 border border-gray-100 rounded-2xl group hover:border-rose-200 transition-colors">
-                    <div>
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">{ev.key}</p>
-                      <p className="text-xs font-mono text-gray-800 break-all pr-4">{ev.value}</p>
-                    </div>
-                    <button 
-                      onClick={() => navigator.clipboard.writeText(ev.value)}
-                      className="text-gray-400 hover:text-rose-500 p-2"
-                    >
-                      <i className="far fa-copy"></i>
-                    </button>
-                  </div>
-                ))}
-              </div>
-
               <div className="p-5 bg-blue-50 rounded-3xl border border-blue-100">
-                <p className="text-xs text-blue-800 leading-relaxed">
-                  💡 <strong>Note:</strong> Jab tak aap Render ke settings mein ye variables nahi daalte, bot sirf tab tak chalega jab tak aapka ye tab (browser) khula hai. Render par permanent chalane ke liye variables zaroori hain.
+                <p className="text-sm text-blue-900 font-bold mb-2 italic">UptimeRobot Free Plan Limits:</p>
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="bg-white p-3 rounded-2xl border border-blue-100 text-center">
+                      <p className="text-[10px] text-gray-400 font-bold uppercase">Monitors</p>
+                      <p className="text-lg font-black text-blue-600">50</p>
+                   </div>
+                   <div className="bg-white p-3 rounded-2xl border border-blue-100 text-center">
+                      <p className="text-[10px] text-gray-400 font-bold uppercase">Interval</p>
+                      <p className="text-lg font-black text-blue-600">5 Min</p>
+                   </div>
+                </div>
+                <p className="text-[10px] text-blue-700 mt-3 leading-tight">
+                  ✅ 5 minute interval Render ko kabhi sone nahi dega. Aapko 50 monitors milte hain toh ye lifetime free rahega.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="text-sm font-black text-gray-800 uppercase flex items-center gap-2">
+                   <i className="fas fa-key text-rose-500"></i> Render Environment Keys:
+                </h4>
+                <div className="grid grid-cols-1 gap-3">
+                  {envVars.map(ev => (
+                    <div key={ev.key} className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-2xl group hover:border-rose-400 transition-all">
+                      <div>
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">{ev.key}</p>
+                        <p className="text-xs font-mono text-gray-800 break-all pr-4">{ev.value || "Sidebar mein token daalein!"}</p>
+                      </div>
+                      <button 
+                        onClick={() => navigator.clipboard.writeText(ev.value)}
+                        className="bg-white border border-gray-200 p-2.5 rounded-xl text-gray-500 hover:bg-rose-500 hover:text-white transition-all shadow-sm"
+                      >
+                        <i className="far fa-copy"></i>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-5 bg-green-50 rounded-3xl border border-green-100">
+                <p className="text-xs text-green-800 leading-relaxed font-medium">
+                  🚀 <strong>Steps:</strong> Render Dashboard -> Environment -> Add Variables. <br/>
+                  Phir <strong>UptimeRobot</strong> mein naya monitor banayein aur Render ki URL daal dein (e.g., <code>https://bot-n4ce.onrender.com/health</code>).
                 </p>
               </div>
             </div>
@@ -141,9 +153,9 @@ const App: React.FC = () => {
             <div className="p-6 bg-gray-50 border-t border-gray-100">
               <button 
                 onClick={() => setShowDeployModal(false)}
-                className="w-full py-4 bg-rose-600 text-white rounded-2xl font-bold text-sm shadow-xl shadow-rose-200 hover:bg-rose-700 transition-all"
+                className="w-full py-4 bg-black text-white rounded-2xl font-bold text-sm shadow-xl hover:bg-gray-900 transition-all"
               >
-                THEEK HAI, SAMAJH GAYA! ❤️
+                THEEK HAI! AB BOT KABHI NAHI SOYEGA. 🚀
               </button>
             </div>
           </div>
