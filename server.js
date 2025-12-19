@@ -8,17 +8,14 @@ import { GoogleGenAI } from "@google/genai";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
-// --- CONFIGURATION ---
-// These MUST be set in Render Dashboard -> Environment
 const BOT_TOKEN = (process.env.TELEGRAM_TOKEN || "").trim();
 const GEMINI_KEY = (process.env.API_KEY || "").trim(); 
 const PORT = process.env.PORT || 10000;
 
-// Log initialization status for Render logs
-console.log("--- BOT INITIALIZATION ---");
-console.log(`TELEGRAM_TOKEN: ${BOT_TOKEN ? "FOUND ✅" : "MISSING ❌"}`);
-console.log(`API_KEY: ${GEMINI_KEY ? "FOUND ✅" : "MISSING ❌"}`);
-console.log("--------------------------");
+console.log("--- BOT STATUS ---");
+console.log(`TELEGRAM_TOKEN: ${BOT_TOKEN ? "OK" : "MISSING"}`);
+console.log(`API_KEY: ${GEMINI_KEY ? "OK" : "MISSING"}`);
+console.log("------------------");
 
 const userSessions = new Map();
 
@@ -43,28 +40,27 @@ const roleScenarios = {
 const roleAppearance = {
     'Girlfriend': "a beautiful 18-19 year old Indian girl, wearing trendy casual clothes",
     'BestFriend': "a cute 18-19 year old Indian girl, wearing simple college clothes",
-    'Teacher': "a professional 25 year old Indian woman, wearing a formal elegant saree and glasses, intellectual look",
-    'Aunty': "a mature 35-40 year old Indian woman, wearing a traditional heavy saree, graceful and homely look",
-    'StepMom': "a graceful 32-35 year old Indian woman, wearing elegant house clothes or a simple salwar kameez",
-    'StepSister': "a modern 20 year old Indian girl, wearing cool stylish western clothes"
+    'Teacher': "a professional 25 year old Indian woman, wearing a formal elegant saree and glasses",
+    'Aunty': "a mature 35-40 year old Indian woman, wearing a traditional saree, graceful and homely",
+    'StepMom': "a graceful 32-35 year old Indian woman, wearing simple house clothes",
+    'StepSister': "a modern 20 year old Indian girl, wearing stylish western clothes"
 };
 
 function getLangInstruction(lang) {
-    const emojiRules = " Use dher saare expressive emojis (❤️, ✨, 😊, 🌸, 🥰, 🥺, 😋).";
+    const emojiRules = " Use many expressive emojis.";
     switch(lang) {
-        case 'Hindi': return "STRICTLY use HINDI language only (Devanagari script). No English." + emojiRules;
-        case 'Tamil': return "STRICTLY use TAMIL language only. No English." + emojiRules;
-        case 'English': return "STRICTLY use ENGLISH language only." + emojiRules;
-        case 'Hinglish': return "Use HINGLISH (Hindi mixed with English in Roman script). Natural chat style." + emojiRules;
-        default: return "Use English." + emojiRules;
+        case 'Hindi': return "Use HINDI only (Devanagari). No English." + emojiRules;
+        case 'Tamil': return "Use TAMIL only." + emojiRules;
+        case 'English': return "Use ENGLISH only." + emojiRules;
+        case 'Hinglish': return "Use natural HINGLISH (Hindi mixed with English in Roman script)." + emojiRules;
+        default: return "Use Hinglish." + emojiRules;
     }
 }
 
 async function generateContextImage(ai, visualDescription, role, characterName) {
     try {
         const appearance = roleAppearance[role] || "a beautiful Indian girl";
-        const prompt = `A realistic high-quality cinematic photo of an Indian woman named ${characterName}. She is ${appearance}. Scene: ${visualDescription}. Natural lighting, detailed facial features, emotional expression, 4k resolution, bokeh background.`;
-        
+        const prompt = `Realistic cinematic photo of ${characterName}, ${appearance}. Scene: ${visualDescription}. Natural lighting, 4k.`;
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: prompt }] },
@@ -73,29 +69,20 @@ async function generateContextImage(ai, visualDescription, role, characterName) 
         for (const part of response.candidates[0].content.parts) {
             if (part.inlineData) return part.inlineData.data;
         }
-    } catch (e) {
-        console.error("Image Gen Error:", e);
-    }
+    } catch (e) { console.error("Img Error"); }
     return null;
 }
 
-// Health check for Render / UptimeRobot
-app.get('/health', (req, res) => {
-    res.status(200).send("Bot is alive and kicking! ❤️");
-});
+app.get('/health', (req, res) => res.status(200).send("Alive"));
 
 if (BOT_TOKEN && GEMINI_KEY) {
     const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
     const bot = new Telegraf(BOT_TOKEN);
 
-    bot.catch((err) => console.error(`Telegraf Error:`, err));
-
     bot.start((ctx) => {
-        const userName = ctx.from.first_name || "User";
         userSessions.delete(ctx.chat.id);
-        userSessions.set(ctx.chat.id, { userName: userName, step: 'role_selection' });
-
-        return ctx.reply(`Namaste ${userName}! Welcome to SoulMate Studio! ❤️\n\nKaun sa character choose karna chahenge?`, 
+        userSessions.set(ctx.chat.id, { userName: ctx.from.first_name || "User", step: 'role_selection' });
+        return ctx.reply(`Aap kisse baat karna chahenge?`, 
             Markup.inlineKeyboard([
                 [Markup.button.callback('❤️ Girlfriend', 'role_Girlfriend'), Markup.button.callback('🤝 Best Friend', 'role_BestFriend')],
                 [Markup.button.callback('👩‍🏫 Teacher', 'role_Teacher'), Markup.button.callback('💃 Aunty', 'role_Aunty')],
@@ -107,19 +94,18 @@ if (BOT_TOKEN && GEMINI_KEY) {
     bot.action(/role_(.+)/, (ctx) => {
         const selectedRole = ctx.match[1];
         const session = userSessions.get(ctx.chat.id);
-        const userName = session?.userName || ctx.from.first_name || "User";
         const names = namePools[selectedRole];
         const assignedName = names[Math.floor(Math.random() * names.length)];
         
         userSessions.set(ctx.chat.id, { 
+            ...session,
             role: selectedRole, 
             name: assignedName,
-            userName: userName,
             lang: 'Hinglish', 
             history: [] 
         });
 
-        return ctx.editMessageText(`${userName}, aapne ${assignedName} (${selectedRole}) ko choose kiya hai. ✨\n\nAb humari bhasha chunein:`, 
+        return ctx.editMessageText(`Bhasha chunein:`, 
             Markup.inlineKeyboard([
                 [Markup.button.callback('🇬🇧 English', 'lang_English'), Markup.button.callback('🌍 Hinglish', 'lang_Hinglish')],
                 [Markup.button.callback('🇮🇳 Hindi', 'lang_Hindi'), Markup.button.callback('🪔 Tamil', 'lang_Tamil')]
@@ -129,34 +115,33 @@ if (BOT_TOKEN && GEMINI_KEY) {
 
     bot.action(/lang_(.+)/, async (ctx) => {
         const session = userSessions.get(ctx.chat.id);
-        if (!session) return ctx.reply("Please use /start again.");
-        const selectedLang = ctx.match[1];
-        session.lang = selectedLang;
+        if (!session) return ctx.reply("Please use /start");
+        session.lang = ctx.match[1];
         const { role, name, lang, userName } = session;
-        const scenario = roleScenarios[role] || "We just met.";
+        const scenario = roleScenarios[role] || "Meeting now.";
         
-        await ctx.answerCbQuery(`${name} is typing...`);
+        await ctx.answerCbQuery();
         await ctx.sendChatAction('upload_photo');
 
         try {
             const languageInstruction = getLangInstruction(lang);
             const introResponse = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: `Setting: ${scenario}. Introduce yourself as ${name} to ${userName}. Act as ${role}. 1 short line. Call them by their name.`,
+                contents: `Setting: ${scenario}. Introduce yourself as ${name}. Act as ${role}. 1 short line.`,
                 config: {
-                    systemInstruction: `You are ${name}. Role: ${role}. Talking to user named ${userName}. ${languageInstruction} Never mention you are AI. Use *asterisks* for actions.`,
+                    systemInstruction: `You are ${name}. Role: ${role}. User: ${userName}. ${languageInstruction}. 
+                    CRITICAL: Use 3rd person female for actions in *asterisks*. For example, use "*muskurate hue bolti hai*" instead of "*bolti hu*". 
+                    Always describe your actions/state in 3rd person present tense. Never mention AI.`,
                     temperature: 0.8
                 }
             });
 
-            const introText = introResponse.text || `Hello ${userName}! I am ${name}. ❤️`;
+            const introText = introResponse.text || `Hello! I am ${name}. ❤️`;
             session.history.push({ role: "model", content: introText });
-            const imageData = await generateContextImage(ai, `Intro: ${scenario}`, role, name);
+            const imageData = await generateContextImage(ai, scenario, role, name);
             if (imageData) await ctx.replyWithPhoto({ source: Buffer.from(imageData, 'base64') }, { caption: introText });
             else await ctx.reply(introText);
-        } catch (e) {
-            await ctx.reply(`Hey ${userName}! I am ${name}. ❤️`);
-        }
+        } catch (e) { await ctx.reply(`I am ${name}. ❤️`); }
     });
 
     bot.on('text', async (ctx) => {
@@ -176,7 +161,9 @@ if (BOT_TOKEN && GEMINI_KEY) {
                 model: 'gemini-3-flash-preview',
                 contents: [...chatHistoryForAI, { parts: [{ text: userText }] }],
                 config: {
-                    systemInstruction: `Name: ${name}. Role: ${role}. Talking to ${userName}. ${languageInstruction} Address them by name occasionally. Max 2 lines. Use *asterisks* for actions.`,
+                    systemInstruction: `Name: ${name}. Role: ${role}. User: ${userName}. ${languageInstruction}. 
+                    CRITICAL: Describe actions in *asterisks* using 3rd person female (e.g., "*sharmate hue dekhti hai*", "*paas aati hai*", "*muskurate hue bolti hai*"). 
+                    NEVER use 1st person for actions like "*bolti hu*". Max 2 lines. Stay immersive.`,
                     temperature: 0.9
                 }
             });
@@ -184,19 +171,17 @@ if (BOT_TOKEN && GEMINI_KEY) {
             const reply = response.text || "Mmm... ❤️";
             const visualPromptResponse = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: `Context: ${reply}. 8 word photo description of ${name}.`,
+                contents: `Context: ${reply}. 8 word photo description of ${name} acting this out.`,
             });
             const imageData = await generateContextImage(ai, visualPromptResponse.text, role, name);
 
             history.push({ role: "user", content: userText });
             history.push({ role: "model", content: reply });
-            if (history.length > 40) history.splice(0, 2);
+            if (history.length > 20) history.splice(0, 2);
             
             if (imageData) await ctx.replyWithPhoto({ source: Buffer.from(imageData, 'base64') }, { caption: reply });
             else await ctx.reply(reply);
-        } catch (e) {
-            await ctx.reply("Something went wrong... ❤️");
-        }
+        } catch (e) { await ctx.reply("Something went wrong... ❤️"); }
     });
 
     bot.launch();
@@ -204,4 +189,4 @@ if (BOT_TOKEN && GEMINI_KEY) {
 
 app.use(express.static(path.join(__dirname, 'dist')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'dist', 'index.html')));
-app.listen(PORT, () => console.log(`🚀 Server running on Port ${PORT}`));
+app.listen(PORT, () => console.log(`Server on Port ${PORT}`));
