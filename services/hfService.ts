@@ -21,14 +21,14 @@ export class AiChatService {
       if (!token) return "⚠️ Gemini Key missing! Sidebar mein daalein.";
       
       try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${token}`;
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${token}`;
         
         let langContext = "";
-        if (this.config.language === 'Tamil') langContext = "Respond ONLY in Tamil script.";
-        else if (this.config.language === 'Hindi') langContext = "Respond ONLY in Hindi Devanagari script.";
+        if (this.config.language === 'Tamil') langContext = "STRICTLY respond ONLY in Tamil script.";
+        else if (this.config.language === 'Hindi') langContext = "STRICTLY respond ONLY in Hindi Devanagari script.";
+        else if (this.config.language === 'English') langContext = "STRICTLY respond ONLY in English.";
         else langContext = "Respond in Hinglish (Roman script).";
 
-        // Injecting the specific scenario for the simulation too
         const response = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },

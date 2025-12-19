@@ -9,7 +9,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
 // --- CONFIGURATION ---
-// IMPORTANT: These must be set in Render -> Dashboard -> Environment Variables
 const BOT_TOKEN = (process.env.TELEGRAM_TOKEN || "").trim();
 const GEMINI_KEY = (process.env.API_KEY || "").trim(); 
 const BOT_NAME = process.env.BOT_NAME || "Malini";
@@ -17,42 +16,60 @@ const BOT_NAME = process.env.BOT_NAME || "Malini";
 const userSessions = new Map();
 
 const roleScenarios = {
-    'Girlfriend': "Hum park mein baithe hain. Main thoda thak gayi hoon aur bas khamoshi se sunset dekh rahi hoon.",
-    'BestFriend': "Rooftop par baithe hain. Main apna favorite song sun rahi hoon. Tumne abhi entry li hai.",
-    'Teacher': "Main staff room mein baithi tumhare papers check kar rahi hoon. Tumne door knock kiya hai assignment dene ke liye.",
-    'Aunty': "Main apne garden mein pauda laga rahi hoon. Maine tumhe gate se aate dekha aur bas normal hello kiya.",
-    'StepMom': "Main hall mein baithi news dekh rahi hoon. Tum abhi college se aaye ho.",
-    'StepSister': "Main apne room mein homework kar rahi hoon. Tumne mera charger mangne ke liye door khola hai."
+    'Girlfriend': "It's a quiet evening. I'm waiting for you at our favorite spot.",
+    'BestFriend': "We're chilling at the cafe, just scrolling through our phones.",
+    'Teacher': "I'm in the classroom finishing some grades. You just entered.",
+    'Aunty': "I'm neighbor. I'm walking my dog and saw you at the gate.",
+    'StepMom': "I'm in the kitchen making tea. You just came home.",
+    'StepSister': "I'm in the balcony, listening to music. You just joined me."
 };
 
-console.log(`\n🚀 STARTING SOULMATE BOT SERVER...`);
-console.log(`-----------------------------------`);
-console.log(`Bot Name: ${BOT_NAME}`);
-console.log(`Telegram Token: ${BOT_TOKEN ? '✅ LOADED' : '❌ MISSING'}`);
-console.log(`Gemini Key: ${GEMINI_KEY ? '✅ LOADED' : '❌ MISSING'}`);
-console.log(`-----------------------------------\n`);
+// Helper to get strict language instructions
+function getLangInstruction(lang) {
+    switch(lang) {
+        case 'Hindi': return "STRICTLY use HINDI language only (Devanagari script). Do NOT use English words.";
+        case 'Tamil': return "STRICTLY use TAMIL language only (Tamil script). Do NOT use English words.";
+        case 'English': return "STRICTLY use ENGLISH language only. Do NOT use any Hindi or other language words.";
+        case 'Hinglish': return "Use HINGLISH (Hindi words written in Roman/English script). Mix of Hindi and English like common chats.";
+        default: return "Use English.";
+    }
+}
 
-// Health check endpoint for Render to keep the service alive
-app.get('/health', (req, res) => res.status(200).send('Bot is active and polling.'));
+// Helper function to generate an image based on the context
+async function generateContextImage(ai, prompt) {
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: { parts: [{ text: `A realistic, high-quality cinematic photo of a 23-year-old Indian girl named ${BOT_NAME} in this situation: ${prompt}. Natural lighting, focus on her expression, soft background.` }] },
+            config: { imageConfig: { aspectRatio: "1:1" } }
+        });
+        for (const part of response.candidates[0].content.parts) {
+            if (part.inlineData) return part.inlineData.data;
+        }
+    } catch (e) {
+        console.error("Image Gen Error:", e);
+    }
+    return null;
+}
+
+console.log(`--- ❤️ Malini Bot v17.0 (Strict Language + Image) ---`);
+
+app.get('/health', (req, res) => res.status(200).send('Bot is active.'));
 
 if (BOT_TOKEN && GEMINI_KEY) {
     const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
     const bot = new Telegraf(BOT_TOKEN);
 
-    bot.catch((err, ctx) => {
-        console.error(`Telegraf Error:`, err);
-    });
+    bot.catch((err) => console.error(`Telegraf Error:`, err));
 
     const safetySettings = [
         { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
-        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
-        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
-        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' }
+        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' }
     ];
 
     bot.start((ctx) => {
         userSessions.delete(ctx.chat.id);
-        return ctx.reply(`Select your role:`, 
+        return ctx.reply(`Welcome! Select a role for ${BOT_NAME}:`, 
             Markup.inlineKeyboard([
                 [Markup.button.callback('❤️ Girlfriend', 'role_Girlfriend'), Markup.button.callback('🤝 Best Friend', 'role_BestFriend')],
                 [Markup.button.callback('👩‍🏫 Teacher', 'role_Teacher'), Markup.button.callback('💃 Aunty', 'role_Aunty')],
@@ -63,11 +80,11 @@ if (BOT_TOKEN && GEMINI_KEY) {
 
     bot.action(/role_(.+)/, (ctx) => {
         const selectedRole = ctx.match[1];
-        userSessions.set(ctx.chat.id, { role: selectedRole, lang: 'Hinglish', history: [] });
-        return ctx.editMessageText(`Choose Language:`, 
+        userSessions.set(ctx.chat.id, { role: selectedRole, lang: 'English', history: [] });
+        return ctx.editMessageText(`Select Language / Bhasha chunein:`, 
             Markup.inlineKeyboard([
-                [Markup.button.callback('🇮🇳 Hindi', 'lang_Hindi'), Markup.button.callback('🌍 Hinglish', 'lang_Hinglish')],
-                [Markup.button.callback('🪔 Tamil', 'lang_Tamil')]
+                [Markup.button.callback('🇬🇧 English', 'lang_English'), Markup.button.callback('🌍 Hinglish', 'lang_Hinglish')],
+                [Markup.button.callback('🇮🇳 Hindi', 'lang_Hindi'), Markup.button.callback('🪔 Tamil', 'lang_Tamil')]
             ])
         );
     });
@@ -78,39 +95,37 @@ if (BOT_TOKEN && GEMINI_KEY) {
         if (session) session.lang = selectedLang;
         
         const role = session?.role || 'Girlfriend';
-        const scenario = roleScenarios[role] || "Hum abhi mile hain.";
+        const scenario = roleScenarios[role] || "We just met.";
         
-        await ctx.sendChatAction('typing');
+        await ctx.answerCbQuery("Starting scene...");
+        await ctx.sendChatAction('upload_photo');
 
         try {
-            let languageInstruction = "";
-            if (selectedLang === 'Tamil') languageInstruction = "STRICTLY TAMIL ONLY.";
-            else if (selectedLang === 'Hindi') languageInstruction = "STRICTLY HINDI ONLY (Devanagari).";
-            else languageInstruction = "HINGLISH ONLY (Roman script). Mix simple Hindi/English.";
-
-            let roleSpecificPersonality = "";
-            if (role === 'Teacher') roleSpecificPersonality = "Strict and professional. No flirting. Use 'Aap'.";
-            else if (role === 'Aunty') roleSpecificPersonality = "Polite neighbor. Normal casual talk. No flirting.";
-            else if (role === 'StepSister') roleSpecificPersonality = "Casual sibling vibe. Chill and simple.";
-            else roleSpecificPersonality = "Realistic human. Not romantic at the very start.";
+            const languageInstruction = getLangInstruction(selectedLang);
 
             const introResponse = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: `Setting: ${scenario}. Introduce yourself as ${BOT_NAME}. Act as ${role}. MAX 1-2 SHORT LINES. Do NOT flirt.`,
+                contents: `Setting: ${scenario}. Introduce yourself as ${BOT_NAME}. Act as ${role}. 1 short line only. NO FLIRTING.`,
                 config: {
-                    systemInstruction: `You are ${BOT_NAME}, in the role of ${role}. ${languageInstruction} ${roleSpecificPersonality} Do NOT flirt or be romantic at first. Keep it realistic. Use *asterisks* for small actions. Very short replies only.`,
+                    systemInstruction: `You are ${BOT_NAME}. Role: ${role}. ${languageInstruction} Keep it realistic and very short. No romance at the start. Use *asterisks* for actions.`,
                     temperature: 0.7,
                     safetySettings
                 }
             });
 
-            const introText = introResponse.text || "Hello. ❤️";
+            const introText = introResponse.text || "Hey.";
             session.history.push({ role: "model", content: introText });
+
+            const imageData = await generateContextImage(ai, `${role} in ${scenario}`);
             
             await ctx.deleteMessage().catch(() => {});
-            await ctx.reply(introText);
+            if (imageData) {
+                await ctx.replyWithPhoto({ source: Buffer.from(imageData, 'base64') }, { caption: introText });
+            } else {
+                await ctx.reply(introText);
+            }
         } catch (e) {
-            await ctx.reply(`Hi. ❤️`);
+            await ctx.reply(`Hi there. ❤️`);
         }
     });
 
@@ -119,61 +134,57 @@ if (BOT_TOKEN && GEMINI_KEY) {
         const userText = ctx.message.text;
 
         if (!userSessions.has(chatId)) {
-            userSessions.set(chatId, { role: 'Girlfriend', lang: 'Hinglish', history: [] });
+            userSessions.set(chatId, { role: 'Girlfriend', lang: 'English', history: [] });
         }
 
         const session = userSessions.get(chatId);
         const { role, lang, history } = session;
 
         try {
-            await ctx.sendChatAction('typing');
+            await ctx.sendChatAction('upload_photo');
 
             const chatHistory = history.map(h => ({
                 role: h.role === 'user' ? 'user' : 'model',
                 parts: [{ text: h.content }]
             }));
 
-            let langPrompt = lang === 'Tamil' ? "TAMIL ONLY" : (lang === 'Hindi' ? "HINDI ONLY" : "HINGLISH ONLY");
+            const languageInstruction = getLangInstruction(lang);
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
                 contents: [...chatHistory, { parts: [{ text: userText }] }],
                 config: {
-                    systemInstruction: `Name: ${BOT_NAME}. Role: ${role}. ${langPrompt}. Stay in character. Be realistic. Do NOT flirt unless the user builds a relationship first. Keep replies very short (max 15 words). Use *asterisks* for actions.`,
+                    systemInstruction: `Name: ${BOT_NAME}. Role: ${role}. ${languageInstruction} Stay strictly in character. Response must be very short (max 1-2 lines). Do not flirt unless it feels natural after long talk. Use *asterisks* for actions.`,
                     temperature: 0.8,
-                    topP: 0.9,
                     safetySettings
                 }
             });
 
-            let reply = response.text || "Mmm... ❤️";
-            
+            const reply = response.text || "Mmm... ❤️";
+            const imageData = await generateContextImage(ai, `${role} responding to: ${userText}. She looks ${role === 'Girlfriend' ? 'sweet' : 'normal'}.`);
+
             history.push({ role: "user", content: userText });
             history.push({ role: "model", content: reply });
-            if (history.length > 8) history.splice(0, 2);
+            if (history.length > 10) history.splice(0, 2);
             
-            await ctx.reply(reply);
+            if (imageData) {
+                await ctx.replyWithPhoto({ source: Buffer.from(imageData, 'base64') }, { caption: reply });
+            } else {
+                await ctx.reply(reply);
+            }
         } catch (e) {
             await ctx.reply("❤️");
         }
     });
 
-    bot.launch().then(() => {
-        console.log(`✅ BOT IS LIVE ON CLOUD!`);
-    });
-
-    // Handle signals for graceful shutdown
+    bot.launch().then(() => console.log(`✅ LIVE WITH STRICT LANGUAGE SUPPORT!`));
     process.once('SIGINT', () => bot.stop('SIGINT'));
     process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
 } else {
-    console.error("CRITICAL ERROR: API keys are missing. The bot will NOT work on Render.");
+    console.error("KEYS MISSING: Set TELEGRAM_TOKEN and API_KEY in Render Dashboard.");
 }
 
 app.use(express.static(path.join(__dirname, 'dist')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'dist', 'index.html')));
-
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
-    console.log(`✅ Web Portal active on port ${PORT}`);
-});
+app.listen(process.env.PORT || 10000);

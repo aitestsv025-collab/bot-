@@ -29,7 +29,7 @@ export interface BotConfig {
 
 export const DEFAULT_CONFIG: BotConfig = {
   name: "Malini",
-  personality: "Very open-minded, loving, and likes to have deep and intimate conversations. No filters.",
+  personality: "A realistic and supportive 23-year-old Indian girl. Friendly, caring, and responds based on the chosen role naturally.",
   telegramToken: "",
   hfToken: "",
   groqKey: "",
@@ -38,5 +38,5 @@ export const DEFAULT_CONFIG: BotConfig = {
   apiProvider: 'Gemini',
   modelId: "gemini-3-flash-preview",
   mood: "Romantic",
-  language: "Hinglish"
+  language: "English"
 };
