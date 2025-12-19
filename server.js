@@ -24,6 +24,16 @@ const roleScenarios = {
     'StepSister': "I'm in the balcony, listening to music. You just joined me."
 };
 
+// Role-based appearance mapping
+const roleAppearance = {
+    'Girlfriend': "a beautiful 18-19 year old Indian girl, wearing pretty casual clothes",
+    'BestFriend': "a cute 18-19 year old Indian girl, wearing trendy casual clothes",
+    'Teacher': "a professional 25 year old Indian woman, wearing a formal saree or office attire, intellectual look",
+    'Aunty': "a mature 35-40 year old Indian woman, wearing a traditional saree, graceful and homely look",
+    'StepMom': "a graceful 32-35 year old Indian woman, wearing elegant home clothes",
+    'StepSister': "a modern 20 year old Indian girl, wearing cool stylish clothes"
+};
+
 // Helper to get strict language instructions
 function getLangInstruction(lang) {
     const emojiRules = " Use frequent and expressive emojis in every sentence (like ❤️, ✨, 😊, 🌸, 🥰, 🥺).";
@@ -36,12 +46,13 @@ function getLangInstruction(lang) {
     }
 }
 
-// Helper function to generate an image based on the context
-async function generateContextImage(ai, visualDescription) {
+// Helper function to generate an image based on the context and role
+async function generateContextImage(ai, visualDescription, role) {
     try {
+        const appearance = roleAppearance[role] || "a beautiful 23-year-old Indian girl";
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
-            contents: { parts: [{ text: `A high-quality, realistic cinematic portrait of a beautiful 23-year-old Indian girl named ${BOT_NAME}. Scene: ${visualDescription}. Natural lighting, emotional facial expression, detailed background, 4k resolution.` }] },
+            contents: { parts: [{ text: `A high-quality, realistic cinematic photo of ${BOT_NAME}, who is ${appearance}. Scene: ${visualDescription}. Natural lighting, detailed facial expressions matching the mood, highly detailed 4k realistic photography.` }] },
             config: { imageConfig: { aspectRatio: "1:1" } }
         });
         for (const part of response.candidates[0].content.parts) {
@@ -53,7 +64,7 @@ async function generateContextImage(ai, visualDescription) {
     return null;
 }
 
-console.log(`--- ❤️ Malini Bot v18.0 (Smart Images + Emoji) ---`);
+console.log(`--- ❤️ Malini Bot v19.0 (Role-Aware Visuals) ---`);
 
 app.get('/health', (req, res) => res.status(200).send('Bot is active.'));
 
@@ -117,7 +128,7 @@ if (BOT_TOKEN && GEMINI_KEY) {
             const introText = introResponse.text || "Hey! ❤️";
             session.history.push({ role: "model", content: introText });
 
-            const imageData = await generateContextImage(ai, `${role} in the setting: ${scenario}. She looks natural and welcoming.`);
+            const imageData = await generateContextImage(ai, `${role} in the setting: ${scenario}. She looks natural and welcoming.`, role);
             
             await ctx.deleteMessage().catch(() => {});
             if (imageData) {
@@ -166,11 +177,11 @@ if (BOT_TOKEN && GEMINI_KEY) {
             // Generate visual description for image generation based on AI's own response
             const visualPromptResponse = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: `Based on this response: "${reply}", describe the girl's facial expression and environment in 10 words for an image generator.`,
+                contents: `Based on this response: "${reply}", describe the girl's facial expression and immediate surroundings in 10 words for an image generator. Focus on her emotion.`,
             });
-            const visualDesc = visualPromptResponse.text || `${role} talking to someone.`;
+            const visualDesc = visualPromptResponse.text || `${role} talking.`;
 
-            const imageData = await generateContextImage(ai, visualDesc);
+            const imageData = await generateContextImage(ai, visualDesc, role);
 
             history.push({ role: "user", content: userText });
             history.push({ role: "model", content: reply });
@@ -186,7 +197,7 @@ if (BOT_TOKEN && GEMINI_KEY) {
         }
     });
 
-    bot.launch().then(() => console.log(`✅ LIVE WITH SITUATION-AWARE IMAGES!`));
+    bot.launch().then(() => console.log(`✅ LIVE WITH ROLE-BASED AGES AND ATTIRE!`));
     process.once('SIGINT', () => bot.stop('SIGINT'));
     process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
