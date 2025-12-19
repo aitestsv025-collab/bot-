@@ -144,7 +144,7 @@ const App: React.FC = () => {
 
               <div className="p-5 bg-green-50 rounded-3xl border border-green-100">
                 <p className="text-xs text-green-800 leading-relaxed font-medium">
-                  🚀 <strong>Steps:</strong> Render Dashboard -> Environment -> Add Variables. <br/>
+                  🚀 <strong>Steps:</strong> Render Dashboard &rarr; Environment &rarr; Add Variables. <br/>
                   Phir <strong>UptimeRobot</strong> mein naya monitor banayein aur Render ki URL daal dein (e.g., <code>https://bot-n4ce.onrender.com/health</code>).
                 </p>
               </div>
