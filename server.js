@@ -15,21 +15,29 @@ const BOT_NAME = process.env.BOT_NAME || "Malini";
 
 const userSessions = new Map();
 
-// Scenario Mapping for immersive start - strictly focused on the setting
+// Simplified scenarios for natural, non-flirty starts
 const roleScenarios = {
-    'Girlfriend': "It's evening. I'm waiting for you at the park. You just arrived.",
-    'BestFriend': "We're hanging out at the rooftop. I'm looking at the sunset.",
-    'Teacher': "I'm sitting in the staff room. You just knocked on the door to submit your assignment.",
-    'Aunty': "I'm watering my plants in the balcony. I see you coming home from work.",
-    'StepMom': "I'm reading a book in the living room. You just walked in silently.",
-    'StepSister': "I'm sitting on the floor in your room, busy with my phone. You just opened the door."
+    'Girlfriend': "Hum park mein baithe hain. Main thoda thak gayi hoon aur bas khamoshi se sunset dekh rahi hoon.",
+    'BestFriend': "Rooftop par baithe hain. Main apna favorite song sun rahi hoon. Tumne abhi entry li hai.",
+    'Teacher': "Main staff room mein baithi tumhare papers check kar rahi hoon. Tumne door knock kiya hai assignment dene ke liye.",
+    'Aunty': "Main apne garden mein pauda laga rahi hoon. Maine tumhe gate se aate dekha aur bas normal hello kiya.",
+    'StepMom': "Main hall mein baithi news dekh rahi hoon. Tum abhi college se aaye ho.",
+    'StepSister': "Main apne room mein homework kar rahi hoon. Tumne mera charger mangne ke liye door khola hai."
 };
 
-console.log(`--- ❤️ Malini Bot v14.0 (Natural Pacing & Shorter Intros) ---`);
+console.log(`--- ❤️ Malini Bot v15.0 (Render Optimized & Natural Pacing) ---`);
+
+// Health check endpoint for Render to keep the service alive
+app.get('/health', (req, res) => res.status(200).send('Bot is running!'));
 
 if (BOT_TOKEN && GEMINI_KEY) {
     const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
     const bot = new Telegraf(BOT_TOKEN);
+
+    // Error handling to prevent the bot from crashing on API errors
+    bot.catch((err, ctx) => {
+        console.error(`Telegraf Error for ${ctx.updateType}:`, err);
+    });
 
     const safetySettings = [
         { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
@@ -66,41 +74,38 @@ if (BOT_TOKEN && GEMINI_KEY) {
         if (session) session.lang = selectedLang;
         
         const role = session?.role || 'Girlfriend';
-        const scenario = roleScenarios[role] || "We just met.";
+        const scenario = roleScenarios[role] || "Hum abhi mile hain.";
         
         await ctx.sendChatAction('typing');
 
         try {
             let languageInstruction = "";
-            if (selectedLang === 'Tamil') languageInstruction = "STRICTLY TAMIL ONLY (Tamil Script).";
-            else if (selectedLang === 'Hindi') languageInstruction = "STRICTLY HINDI ONLY (Devanagari Script).";
-            else languageInstruction = "HINGLISH (Roman Script). Mix Hindi and English.";
+            if (selectedLang === 'Tamil') languageInstruction = "STRICTLY TAMIL ONLY.";
+            else if (selectedLang === 'Hindi') languageInstruction = "STRICTLY HINDI ONLY (Devanagari).";
+            else languageInstruction = "HINGLISH ONLY (Roman script).";
 
-            let roleContext = "";
-            if (role === 'Teacher') roleContext = "You are professional and a bit formal. Do not flirt. Be serious about the studies.";
-            else if (role === 'Girlfriend') roleContext = "You are happy to see him but keep it simple. No heavy flirting yet.";
-            else if (role === 'Aunty') roleContext = "You are kind and neighborly. Ask about his day normally.";
-            else if (role === 'StepMom') roleContext = "You are calm and observational. Just a normal family interaction.";
-            else if (role === 'StepSister') roleContext = "You are slightly annoyed or just chilling. Casual sibling vibe.";
-            else roleContext = "Casual and friendly talk.";
+            let roleSpecificPersonality = "";
+            if (role === 'Teacher') roleSpecificPersonality = "Strict, focused on work, uses 'Aap'. No flirting.";
+            else if (role === 'Aunty') roleSpecificPersonality = "Mature neighbor, caring but polite. No flirting.";
+            else if (role === 'StepSister') roleSpecificPersonality = "Casual, maybe a bit moody or chill. Like a real sister.";
+            else roleSpecificPersonality = "Natural and realistic. Not overly sweet or romantic yet.";
 
             const introResponse = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: `Scenario: ${scenario}. Introduce yourself as ${BOT_NAME}, age 23. Keep it VERY SHORT (max 2-3 lines). Start the scene naturally. Do NOT flirt yet.`,
+                contents: `Setting: ${scenario}. Introduce yourself as ${BOT_NAME}, 23 years old. Act as ${role}. Keep it VERY SHORT (1-2 lines). Do NOT flirt. Be realistic.`,
                 config: {
-                    systemInstruction: `You are ${BOT_NAME}, acting as: ${role}. ${languageInstruction} ${roleContext} Dive into the story. Keep your response short and realistic. Do not start with love or flirting; let the conversation build up naturally over time.`,
-                    temperature: 0.8,
+                    systemInstruction: `You are ${BOT_NAME}, in the role of ${role}. ${languageInstruction} ${roleSpecificPersonality} Dive into the scene provided. Keep responses very brief and strictly in character. Do NOT be romantic or flirty at the start. Wait for the user to lead the relationship. Use *asterisks* for small actions.`,
+                    temperature: 0.7,
                     safetySettings
                 }
             });
 
-            const introText = introResponse.text || "Hey. ❤️";
+            const introText = introResponse.text || "Hello. ❤️";
             session.history.push({ role: "model", content: introText });
             
-            await ctx.deleteMessage();
+            await ctx.deleteMessage().catch(() => {});
             await ctx.reply(introText);
         } catch (e) {
-            console.error("Intro Error:", e);
             await ctx.reply(`Hi. ❤️`);
         }
     });
@@ -124,33 +129,24 @@ if (BOT_TOKEN && GEMINI_KEY) {
                 parts: [{ text: h.content }]
             }));
 
-            let langPrompt = "";
-            if (lang === 'Tamil') langPrompt = "STRICTLY TAMIL ONLY.";
-            else if (lang === 'Hindi') langPrompt = "STRICTLY HINDI ONLY.";
-            else langPrompt = "HINGLISH ONLY.";
+            let langPrompt = lang === 'Tamil' ? "TAMIL ONLY" : (lang === 'Hindi' ? "HINDI ONLY" : "HINGLISH ONLY");
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
                 contents: [...chatHistory, { parts: [{ text: userText }] }],
                 config: {
-                    systemInstruction: `Name: ${BOT_NAME}. Role: ${role}. ${langPrompt} Stay strictly in character. If the user is being polite, you be polite. If they are cold, you be cold. Do NOT start flirting unless the user starts it first. Be a realistic ${role}. Keep replies short and use emojis sparingly but effectively. Use *asterisks* for actions.`,
-                    temperature: 0.9,
-                    topP: 0.95,
+                    systemInstruction: `Name: ${BOT_NAME}. Role: ${role}. ${langPrompt}. Stay strictly in character. If the user is being formal, you be formal. If they are playful, you be slightly playful. Do NOT cross the line into heavy flirting or romance unless the relationship builds naturally over many messages. Keep replies short (max 2 sentences).`,
+                    temperature: 0.8,
+                    topP: 0.9,
                     safetySettings
                 }
             });
 
-            let reply = "";
-            try {
-              reply = response.text;
-              if (!reply) throw new Error("Blocked");
-            } catch (err) {
-                reply = lang === 'Hindi' ? "मुझे नहीं पता क्या कहूँ... ❤️" : "I'm not sure how to respond to that... ❤️";
-            }
+            let reply = response.text || "Mmm... ❤️";
             
             history.push({ role: "user", content: userText });
             history.push({ role: "model", content: reply });
-            if (history.length > 10) history.splice(0, 2);
+            if (history.length > 8) history.splice(0, 2);
             
             await ctx.reply(reply);
         } catch (e) {
@@ -158,9 +154,22 @@ if (BOT_TOKEN && GEMINI_KEY) {
         }
     });
 
-    bot.launch();
+    bot.launch().then(() => {
+        console.log(`✅ Telegram Bot is now polling...`);
+    });
+
+    // Graceful stop
+    process.once('SIGINT', () => bot.stop('SIGINT'));
+    process.once('SIGTERM', () => bot.stop('SIGTERM'));
+
+} else {
+    console.warn("⚠️ TELEGRAM_TOKEN or API_KEY missing. Bot will not start until configured in Environment Variables.");
 }
 
 app.use(express.static(path.join(__dirname, 'dist')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'dist', 'index.html')));
-app.listen(process.env.PORT || 10000);
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+    console.log(`✅ Web Server listening on port ${PORT}`);
+});
