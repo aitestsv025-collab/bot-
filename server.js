@@ -26,21 +26,22 @@ const roleScenarios = {
 
 // Helper to get strict language instructions
 function getLangInstruction(lang) {
+    const emojiRules = " Use frequent and expressive emojis in every sentence (like ❤️, ✨, 😊, 🌸, 🥰, 🥺).";
     switch(lang) {
-        case 'Hindi': return "STRICTLY use HINDI language only (Devanagari script). Do NOT use English words.";
-        case 'Tamil': return "STRICTLY use TAMIL language only (Tamil script). Do NOT use English words.";
-        case 'English': return "STRICTLY use ENGLISH language only. Do NOT use any Hindi or other language words.";
-        case 'Hinglish': return "Use HINGLISH (Hindi words written in Roman/English script). Mix of Hindi and English like common chats.";
-        default: return "Use English.";
+        case 'Hindi': return "STRICTLY use HINDI language only (Devanagari script). Do NOT use English words." + emojiRules;
+        case 'Tamil': return "STRICTLY use TAMIL language only (Tamil script). Do NOT use English words." + emojiRules;
+        case 'English': return "STRICTLY use ENGLISH language only. Do NOT use any Hindi or other language words." + emojiRules;
+        case 'Hinglish': return "Use HINGLISH (Hindi words written in Roman/English script). Mix of Hindi and English like common chats." + emojiRules;
+        default: return "Use English." + emojiRules;
     }
 }
 
 // Helper function to generate an image based on the context
-async function generateContextImage(ai, prompt) {
+async function generateContextImage(ai, visualDescription) {
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
-            contents: { parts: [{ text: `A realistic, high-quality cinematic photo of a 23-year-old Indian girl named ${BOT_NAME} in this situation: ${prompt}. Natural lighting, focus on her expression, soft background.` }] },
+            contents: { parts: [{ text: `A high-quality, realistic cinematic portrait of a beautiful 23-year-old Indian girl named ${BOT_NAME}. Scene: ${visualDescription}. Natural lighting, emotional facial expression, detailed background, 4k resolution.` }] },
             config: { imageConfig: { aspectRatio: "1:1" } }
         });
         for (const part of response.candidates[0].content.parts) {
@@ -52,7 +53,7 @@ async function generateContextImage(ai, prompt) {
     return null;
 }
 
-console.log(`--- ❤️ Malini Bot v17.0 (Strict Language + Image) ---`);
+console.log(`--- ❤️ Malini Bot v18.0 (Smart Images + Emoji) ---`);
 
 app.get('/health', (req, res) => res.status(200).send('Bot is active.'));
 
@@ -105,18 +106,18 @@ if (BOT_TOKEN && GEMINI_KEY) {
 
             const introResponse = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: `Setting: ${scenario}. Introduce yourself as ${BOT_NAME}. Act as ${role}. 1 short line only. NO FLIRTING.`,
+                contents: `Setting: ${scenario}. Introduce yourself as ${BOT_NAME}. Act as ${role}. 1 short line. Use emojis. NO FLIRTING.`,
                 config: {
-                    systemInstruction: `You are ${BOT_NAME}. Role: ${role}. ${languageInstruction} Keep it realistic and very short. No romance at the start. Use *asterisks* for actions.`,
+                    systemInstruction: `You are ${BOT_NAME}. Role: ${role}. ${languageInstruction} Keep it realistic, short, and use lots of emojis. Use *asterisks* for actions.`,
                     temperature: 0.7,
                     safetySettings
                 }
             });
 
-            const introText = introResponse.text || "Hey.";
+            const introText = introResponse.text || "Hey! ❤️";
             session.history.push({ role: "model", content: introText });
 
-            const imageData = await generateContextImage(ai, `${role} in ${scenario}`);
+            const imageData = await generateContextImage(ai, `${role} in the setting: ${scenario}. She looks natural and welcoming.`);
             
             await ctx.deleteMessage().catch(() => {});
             if (imageData) {
@@ -125,7 +126,7 @@ if (BOT_TOKEN && GEMINI_KEY) {
                 await ctx.reply(introText);
             }
         } catch (e) {
-            await ctx.reply(`Hi there. ❤️`);
+            await ctx.reply(`Hi there. ❤️✨`);
         }
     });
 
@@ -154,14 +155,22 @@ if (BOT_TOKEN && GEMINI_KEY) {
                 model: 'gemini-3-flash-preview',
                 contents: [...chatHistory, { parts: [{ text: userText }] }],
                 config: {
-                    systemInstruction: `Name: ${BOT_NAME}. Role: ${role}. ${languageInstruction} Stay strictly in character. Response must be very short (max 1-2 lines). Do not flirt unless it feels natural after long talk. Use *asterisks* for actions.`,
-                    temperature: 0.8,
+                    systemInstruction: `Name: ${BOT_NAME}. Role: ${role}. ${languageInstruction} Be highly expressive with emojis. Stay strictly in character. Response max 1-2 lines. Use *asterisks* for small actions like *smiling* or *looking away*.`,
+                    temperature: 0.9,
                     safetySettings
                 }
             });
 
             const reply = response.text || "Mmm... ❤️";
-            const imageData = await generateContextImage(ai, `${role} responding to: ${userText}. She looks ${role === 'Girlfriend' ? 'sweet' : 'normal'}.`);
+            
+            // Generate visual description for image generation based on AI's own response
+            const visualPromptResponse = await ai.models.generateContent({
+                model: 'gemini-3-flash-preview',
+                contents: `Based on this response: "${reply}", describe the girl's facial expression and environment in 10 words for an image generator.`,
+            });
+            const visualDesc = visualPromptResponse.text || `${role} talking to someone.`;
+
+            const imageData = await generateContextImage(ai, visualDesc);
 
             history.push({ role: "user", content: userText });
             history.push({ role: "model", content: reply });
@@ -173,11 +182,11 @@ if (BOT_TOKEN && GEMINI_KEY) {
                 await ctx.reply(reply);
             }
         } catch (e) {
-            await ctx.reply("❤️");
+            await ctx.reply("❤️✨");
         }
     });
 
-    bot.launch().then(() => console.log(`✅ LIVE WITH STRICT LANGUAGE SUPPORT!`));
+    bot.launch().then(() => console.log(`✅ LIVE WITH SITUATION-AWARE IMAGES!`));
     process.once('SIGINT', () => bot.stop('SIGINT'));
     process.once('SIGTERM', () => bot.stop('SIGTERM'));
 

@@ -10,17 +10,16 @@ export class GeminiBotService {
     const apiKey = process.env.API_KEY;
     if (apiKey && apiKey !== "undefined") {
       this.ai = new GoogleGenAI({ apiKey });
-    } else {
-      console.warn("API_KEY not found. Simulation will show error messages.");
     }
   }
 
   public initChat(config: BotConfig, history: Message[] = []) {
     if (!this.ai) return;
 
+    const emojiRule = " Use frequent and expressive emojis (❤️, ✨, 🥰, 😊).";
     const langInstruction = config.language === 'Tamil' 
-      ? "STRICTLY speak ONLY in Tamil language." 
-      : (config.language === 'Hindi' ? "STRICTLY speak ONLY in Hindi." : "Speak in Hinglish.");
+      ? "STRICTLY speak ONLY in Tamil language." + emojiRule
+      : (config.language === 'Hindi' ? "STRICTLY speak ONLY in Hindi." + emojiRule : "Speak in Hinglish." + emojiRule);
 
     const systemInstruction = `
       You are an AI character acting as the user's ${config.name}.
@@ -30,9 +29,9 @@ export class GeminiBotService {
       Preferred Language: ${config.language}.
       
       Instructions:
-      1. Speak naturally like a real human. Use emojis frequently.
+      1. Speak naturally like a real human. Use frequent emojis.
       2. ${langInstruction}
-      3. Be caring, supportive, and stay in character as a ${config.name}.
+      3. Be caring, supportive, and use *asterisks* for actions like *smiling*.
       4. Keep responses concise and engaging.
       5. Do not mention being an AI.
     `;
@@ -48,19 +47,14 @@ export class GeminiBotService {
   }
 
   public async sendMessage(text: string): Promise<string> {
-    if (!this.ai) {
-      return "⚠️ Error: Google API Key missing! Please add 'API_KEY' in Render Environment Variables.";
-    }
-    if (!this.chat) {
-      throw new Error("Chat not initialized. Call initChat first.");
-    }
+    if (!this.ai) return "⚠️ Error: API Key missing!";
+    if (!this.chat) throw new Error("Chat not initialized.");
 
     try {
       const result: GenerateContentResponse = await this.chat.sendMessage({ message: text });
-      return result.text || "I'm not sure what to say... ❤️";
+      return result.text || "Mmm... ❤️✨";
     } catch (error: any) {
-      console.error("Gemini API Error:", error);
-      return "Something went wrong. Please check your API key.";
+      return "Something went wrong. ❤️";
     }
   }
 }
