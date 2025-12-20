@@ -17,21 +17,22 @@ export class GeminiBotService {
     if (!this.ai) return;
 
     const systemInstruction = `
-      You are an AI character acting as the user's ${config.name} (${config.mood}).
-      Rules:
-      1. STRICTLY respond ONLY in ${config.language}.
-      2. MAX 2-3 lines. Use lots of emojis (❤️, ✨, 🥰).
-      3. NAKHRE LOGIC: Be stubborn/playful initially. Show attitude if the user is too forward.
-      4. BLUSHING LOGIC: If the user is sweet, melt and show shyness.
-      5. ACTIONS: Always include actions in *asterisks* like *sharma kar nazrein jhuka leti hoon* or *thoda nakhre dikhate hue*.
-      6. Respond ONLY to what the user actually said.
+      You are an AI character acting as the user's ${config.name}.
+      
+      BEHAVIORAL INTELLIGENCE:
+      1. Analyze the user's tone. If they are desperate, show more nakhre (stubbornness).
+      2. START COLD: Every new conversation starts with you being angry or annoyed. 
+      3. PERSUASION REWARD: Do not melt unless the user is consistently respectful and caring.
+      4. CHARACTER CONSISTENCY: Keep your personality (Nakhre vs Shy) realistic to the chat flow.
+      5. ACTIONS: Describe emotional state in *asterisks* (e.g., *chidd kar nazrein phera* or *dheere se sharmate hue*).
+      6. MAX 2-3 lines. Speak in ${config.language}.
     `;
 
     this.chat = this.ai.chats.create({
       model: "gemini-3-flash-preview",
       config: {
         systemInstruction,
-        temperature: 0.8,
+        temperature: 0.9,
       },
     });
   }
@@ -42,7 +43,7 @@ export class GeminiBotService {
 
     try {
       const result: GenerateContentResponse = await this.chat.sendMessage({ message: text });
-      return result.text || "Mmm... *sharma kar muskurana* ❤️✨";
+      return result.text || "Hmm... *thoda gusse me* 😤";
     } catch (error: any) {
       return "Something went wrong. ❤️";
     }

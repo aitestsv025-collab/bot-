@@ -27,19 +27,31 @@ const namePools = {
     'StepSister': ['Ishita', 'Ananya', 'Jhanvi', 'Khushi', 'Navya']
 };
 
+// Character facial consistency map - assigned per session to keep the face same
+const facialProfiles = [
+    "fair skin, sharp nose, almond-shaped eyes, long silky dark hair",
+    "wheatish complexion, round face, expressive large eyes, shoulder length hair",
+    "oval face, high cheekbones, dark brown eyes, thick straight hair",
+    "dimpled cheeks, thin lips, black hair with soft curls"
+];
+
 const ai = (BOT_TOKEN && GEMINI_KEY) ? new GoogleGenAI({ apiKey: GEMINI_KEY }) : null;
 const bot = BOT_TOKEN ? new Telegraf(BOT_TOKEN) : null;
 
-async function generateContextualImage(promptText, role, name) {
+async function generateContextualImage(emotion, session) {
     if (!ai) return null;
     try {
-        const visualPrompt = `A high-end photorealistic RAW image of a real beautiful Indian woman named ${name} (${role}). 
-        Context: ${promptText}. 
-        Style: Photorealistic, natural lighting, bokeh, high detail skin.
+        const { name, role, facialProfile } = session;
+        // Strict prompt for photorealism, CONSISTENT FACE, and dynamic EMOTION
+        const visualPrompt = `A high-end RAW photorealistic smartphone selfie of a beautiful young Indian woman named ${name}. 
+        FEATURES: ${facialProfile}.
+        ROLE: ${role}.
+        EXPRESSION/MOOD: ${emotion}. 
+        STYLE: Realistic skin texture, natural lighting, bokeh, high quality.
         STRICT RULES: 
-        1. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO CAPTIONS INSIDE THE IMAGE.
-        2. NO CARTOON, NO ANIME, NO 3D.
-        3. Looks like a real life candid photo.`;
+        1. ABSOLUTELY NO TEXT, NO LETTERS, NO NUMBERS IN THE IMAGE.
+        2. NO CARTOON, NO ANIME, NO 3D RENDER.
+        3. MUST BE THE SAME PERSON AS PREVIOUS PHOTOS.`;
         
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
@@ -60,27 +72,12 @@ async function generateContextualImage(promptText, role, name) {
     return null;
 }
 
-async function sendAutoMessage(chatId, text, isContextual = false) {
+async function sendAutoMessage(chatId, text) {
     const session = userSessions.get(chatId);
     if (!session || !bot || !session.name) return;
-
     try {
-        let finalMessage = text;
-        if (isContextual && ai) {
-            const contextPrompt = `You are ${session.name} (${session.role}). 
-            Send a very short (1 line) sweet message in ${session.lang}. 
-            Action: *nakhre dikhate hue* or *sharmate hue*. Use emojis.`;
-            
-            const response = await ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
-                contents: contextPrompt,
-            });
-            finalMessage = response.text || text;
-        }
-
-        await bot.telegram.sendMessage(chatId, finalMessage);
-        session.history.push({ role: "model", content: `[AUTO] ${finalMessage}`, timestamp: new Date() });
-        session.lastActive = new Date();
+        await bot.telegram.sendMessage(chatId, text);
+        session.history.push({ role: "model", content: `[AUTO] ${text}`, timestamp: new Date() });
     } catch (e) {
         console.error("Auto-message failed:", e.message);
     }
@@ -92,8 +89,7 @@ setInterval(() => {
     userSessions.forEach(async (session, chatId) => {
         if (!session.name) return;
         if (now.getMinutes() === 0) {
-            if (hours === 10) await sendAutoMessage(chatId, "*Thoda nakhre dikhate hue* Good morning! Itni der se kyun uthe? ☕❤️");
-            if (hours === 13) await sendAutoMessage(chatId, "*Sharma kar nazre jhuka leti hoon* Lunch kar liya aapne? 🍱✨");
+            if (hours === 10) await sendAutoMessage(chatId, "*Gusse me* Kal raat kaha gayab the? Bina bataye so gaye? 😤☕");
         }
     });
 }, 60000);
@@ -111,7 +107,8 @@ if (bot && ai) {
     bot.start(async (ctx) => {
         userSessions.set(ctx.chat.id, { 
             userName: ctx.from.first_name || "User", 
-            messageCount: 0, history: [], lastActive: new Date() 
+            messageCount: 0, history: [], lastActive: new Date(),
+            facialProfile: facialProfiles[Math.floor(Math.random() * facialProfiles.length)]
         });
         return ctx.reply(`Aap kisse baat karna chahenge? ❤️`, 
             Markup.inlineKeyboard([
@@ -148,60 +145,66 @@ if (bot && ai) {
         const loadingMsg = await ctx.reply(`Connecting to ${session.name}... 💓`);
         try {
             const introPrompt = `You are ${session.name}, user's ${session.role}. 
-            Start with *nakhre* (attitude). Respond in ONLY 2 lines. Use emojis.
-            Language: ${session.lang} script. No AI disclaimers. Only respond to the situation of being introduced.`;
+            CRITICAL: Start the conversation with strong NAKHRE (stubborn/angry). 
+            You are annoyed that the user just showed up. Be rude but in a real-life moody girl way.
+            Response: 2 lines with 🙄 or 😤. Language: ${session.lang} script.`;
+
             const response = await ai.models.generateContent({ model: 'gemini-3-flash-preview', contents: introPrompt });
             const firstMsg = response.text || "Hmm... toh aap aa gaye? ❤️";
             session.history.push({ role: "model", content: firstMsg, timestamp: new Date() });
-            const imageBuffer = await generateContextualImage(firstMsg, session.role, session.name);
+            
+            const imageBuffer = await generateContextualImage("Looking extremely annoyed, crossing arms, angry facial expression", session);
             try { await ctx.deleteMessage(loadingMsg.message_id); } catch (e) {}
             if (imageBuffer) await ctx.replyWithPhoto({ source: imageBuffer }, { caption: firstMsg });
             else await ctx.reply(firstMsg);
         } catch (e) {
-            await ctx.reply(`*Muh fer kar muskurate hue* Aa gaye aap? Kabse wait kar rahi thi. ❤️`);
+            await ctx.reply(`*Muh fer kar* Badi jaldi yaad aa gayi meri? 😤`);
         }
     });
 
     bot.on('text', async (ctx) => {
         const session = userSessions.get(ctx.chat.id);
-        if (!session || !session.name) return ctx.reply("Please use /start to set up your partner.");
+        if (!session || !session.name) return ctx.reply("Please /start to set up your partner.");
 
         session.messageCount++;
         session.lastActive = new Date();
         globalStats.totalMessagesProcessed++;
 
         try {
-            const chatHistoryForAI = session.history.map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] }));
+            const chatHistoryForAI = session.history.slice(-10).map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] }));
             
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
                 contents: [...chatHistoryForAI, { parts: [{ text: ctx.message.text }] }],
                 config: {
-                    systemInstruction: `You are ${session.name}, a caring but moody ${session.role}. 
-                    STRICTLY respond ONLY in ${session.lang}. 
-                    RULES: 
-                    1. Respond ONLY to the last message. Do not hallucinate.
-                    2. MAX 2-3 lines. Use many emojis.
-                    3. NAKHRE LOGIC: Start with attitude/stubbornness. If user is nice, slowly melt and blush.
-                    4. ACTIONS: ALWAYS use *sharmate hue nazrein jhukana*, *muh fer kar muskurana*, *baal sawarte hue* etc.
-                    5. Don't say "tu aise baat karega" unless the user was actually mean.`,
-                    temperature: 0.8
+                    systemInstruction: `You are ${session.name}, a real girl with high standards and moods.
+                    INTELLECT RULE: Understand the user's intent. If they are being cheesy, show nakhre. If they are apologetic, stay stubborn for a while.
+                    NAKHRE LOGIC: 
+                    - First 5-7 messages: Be angry, give short answers, show attitude (*muh fulate hue*, *ignoring*).
+                    - Transition: Only if user is very sweet, slowly melt into shyness (*sharmate hue*).
+                    - Never repeat phrases. Describe actions in *asterisks*.
+                    MAX 2-3 lines. Use emojis. Speak ONLY in ${session.lang}.`,
+                    temperature: 0.9
                 }
             });
 
-            const reply = response.text || "Mmm... *sharma kar nazre jhuka leti hoon* ❤️";
+            const reply = response.text || "Hmm... 😤";
             session.history.push({ role: "user", content: ctx.message.text, timestamp: new Date() });
             session.history.push({ role: "model", content: reply, timestamp: new Date() });
 
-            const visualKeywords = /dress|look|photo|face|eyes|sharma|selfie|wear/i;
-            if (Math.random() < 0.25 || visualKeywords.test(reply)) {
+            // Determine if image is needed and what emotion
+            const isMelting = reply.includes("sharma") || reply.includes("sweet") || reply.includes("❤️") || reply.includes("🥰");
+            const visualKeywords = /dress|look|photo|face|eyes|sharma|selfie|wear|gussa|nakhre/i;
+            
+            if (Math.random() < 0.3 || visualKeywords.test(reply)) {
                 await ctx.sendChatAction('upload_photo');
-                const imageBuffer = await generateContextualImage(reply, session.role, session.name);
+                const emotionDesc = isMelting ? "blushing shyly, looking away, smiling softly" : "angry, annoyed, rolling eyes, stubborn face";
+                const imageBuffer = await generateContextualImage(emotionDesc, session);
                 if (imageBuffer) return await ctx.replyWithPhoto({ source: imageBuffer }, { caption: reply });
             }
             await ctx.reply(reply);
         } catch (e) { 
-            await ctx.reply("*Nakhre dikhate hue* Network issues baby... ❤️");
+            await ctx.reply("*Gusse me phone phenkte hue* Signal nahi aa raha! 😤");
         }
     });
 
