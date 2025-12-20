@@ -12,7 +12,12 @@ const BOT_TOKEN = (process.env.TELEGRAM_TOKEN || "").trim();
 const GEMINI_KEY = (process.env.API_KEY || "").trim(); 
 const PORT = process.env.PORT || 10000;
 
+// Central Tracking System
 const userSessions = new Map();
+const globalStats = {
+    totalMessagesProcessed: 0,
+    startTime: new Date()
+};
 
 const namePools = {
     'Girlfriend': ['Riya', 'Sana', 'Ishani', 'Myra', 'Tanvi', 'Priya'],
@@ -55,15 +60,12 @@ function getLangInstruction(lang) {
 async function generateContextImage(ai, visualDescription, role, characterName) {
     try {
         const appearance = roleAppearance[role] || "a beautiful Indian girl";
-        // Prompt engineering to stay within safety while providing 'bra/panty' equivalents
         const prompt = `Cinematic realistic photography of ${characterName}, ${appearance}. ${visualDescription}. High detail skin texture, soft lighting, 8k resolution, masterpiece. Style: Photorealistic.`;
         
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: prompt }] },
-            config: { 
-                imageConfig: { aspectRatio: "9:16" } 
-            }
+            config: { imageConfig: { aspectRatio: "9:16" } }
         });
 
         for (const part of response.candidates[0].content.parts) {
@@ -86,6 +88,28 @@ async function generateContextImage(ai, visualDescription, role, characterName) 
     return null;
 }
 
+// Admin API
+app.get('/api/admin/stats', (req, res) => {
+    const users = Array.from(userSessions.entries()).map(([id, data]) => ({
+        id,
+        userName: data.userName,
+        role: data.role || 'Not Selected',
+        intimacy: data.intimacyLevel || 0,
+        messageCount: data.messageCount || 0,
+        isPremium: data.isPremium || false,
+        lastActive: data.lastActive || new Date(),
+        firstSeen: data.firstSeen || new Date(),
+        chatHistory: data.history || [] // Included chat history
+    }));
+    
+    res.json({
+        totalUsers: userSessions.size,
+        totalMessages: globalStats.totalMessagesProcessed,
+        uptime: Math.floor((new Date() - globalStats.startTime) / 1000 / 60), // in minutes
+        users
+    });
+});
+
 app.get('/health', (req, res) => res.status(200).send("Alive"));
 
 if (BOT_TOKEN && GEMINI_KEY) {
@@ -94,12 +118,20 @@ if (BOT_TOKEN && GEMINI_KEY) {
 
     bot.start(async (ctx) => {
         try { await ctx.deleteMessage(); } catch (e) {}
-        userSessions.delete(ctx.chat.id);
-        userSessions.set(ctx.chat.id, { 
-            userName: ctx.from.first_name || "User", 
-            intimacyLevel: 0,
-            mood: 'Neutral'
-        });
+        
+        const chatId = ctx.chat.id;
+        if (!userSessions.has(chatId)) {
+            userSessions.set(chatId, { 
+                userName: ctx.from.first_name || "User", 
+                intimacyLevel: 0,
+                messageCount: 0,
+                firstSeen: new Date(),
+                lastActive: new Date(),
+                isPremium: false,
+                history: []
+            });
+        }
+        
         return ctx.reply(`Aap kisse baat karna chahenge?`, 
             Markup.inlineKeyboard([
                 [Markup.button.callback('❤️ Girlfriend', 'role_Girlfriend'), Markup.button.callback('🤝 Best Friend', 'role_BestFriend')],
@@ -107,6 +139,14 @@ if (BOT_TOKEN && GEMINI_KEY) {
                 [Markup.button.callback('🏠 Step Mom', 'role_StepMom'), Markup.button.callback('👧 Step Sister', 'role_StepSister')]
             ])
         );
+    });
+
+    bot.command('premium', async (ctx) => {
+        const session = userSessions.get(ctx.chat.id);
+        if (session) {
+            session.isPremium = true; // Simulating a purchase
+            await ctx.reply("✨ Congratulations! Aap ab Premium user hain. Saari spicy images ab easily unlocked hongi.");
+        }
     });
 
     bot.action(/role_(.+)/, async (ctx) => {
@@ -117,12 +157,11 @@ if (BOT_TOKEN && GEMINI_KEY) {
         const names = namePools[selectedRole];
         const assignedName = names[Math.floor(Math.random() * names.length)];
         
-        userSessions.set(ctx.chat.id, { 
-            ...session,
+        Object.assign(session, {
             role: selectedRole, 
             name: assignedName,
-            lang: 'Hinglish', 
-            history: [] 
+            lang: 'Hinglish',
+            lastActive: new Date()
         });
 
         await ctx.answerCbQuery();
@@ -156,14 +195,13 @@ if (BOT_TOKEN && GEMINI_KEY) {
                 contents: `Setting: ${scenario}. Introduce yourself as ${name}. Act as ${role}.`,
                 config: {
                     systemInstruction: `You are ${name}. Role: ${role}. User: ${userName}. ${languageInstruction}. 
-                    STRICT ACTION LOGIC: Describe actions in *asterisks* using 3rd person female ONLY. 
-                    NEVER use "bolti hu". Use "bolti hai". Example: "*darwaza kholti hai aur tumhe dekh kar muskurati hai*".`,
+                    Describe actions in *asterisks* in 3rd person female. NEVER use "bolti hu". Use "bolti hai".`,
                     temperature: 0.8
                 }
             });
 
             const introText = introResponse.text || `Hello! I am ${name}. ❤️`;
-            session.history.push({ role: "model", content: introText });
+            session.history.push({ role: "model", content: introText, timestamp: new Date() });
             const imageData = await generateContextImage(ai, scenario, role, name);
             if (imageData) await ctx.replyWithPhoto({ source: Buffer.from(imageData, 'base64') }, { caption: introText });
             else await ctx.reply(introText);
@@ -176,62 +214,55 @@ if (BOT_TOKEN && GEMINI_KEY) {
         if (!userSessions.has(chatId)) return ctx.reply("Please use /start ❤️");
 
         const session = userSessions.get(chatId);
-        const { role, name, lang, history, userName, intimacyLevel } = session;
+        session.messageCount++;
+        session.lastActive = new Date();
+        globalStats.totalMessagesProcessed++;
+
+        const { role, name, lang, history, userName, intimacyLevel, isPremium } = session;
 
         try {
             await ctx.sendChatAction('upload_photo');
             const chatHistoryForAI = history.map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] }));
-            const languageInstruction = getLangInstruction(lang);
-
-            // Psychology & Intimacy Logic
+            
             const isSpicyRequest = userText.includes("kapde") || userText.includes("bra") || userText.includes("panty") || userText.includes("nude") || userText.includes("photo");
             const isRomantic = userText.includes("love") || userText.includes("pyaar") || userText.includes("beautiful") || userText.includes("janu");
 
             if (isRomantic) session.intimacyLevel += 1;
-            if (userText.length < 5) session.intimacyLevel -= 0.5; // Short messages reduce intimacy
-
+            
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
                 contents: [...chatHistoryForAI, { parts: [{ text: userText }] }],
                 config: {
-                    systemInstruction: `Name: ${name}. Role: ${role}. User: ${userName}. ${languageInstruction}. 
-                    PSYCHOLOGY & ENGAGEMENT RULES:
-                    1. Use 3rd person female actions in *asterisks* (e.g., "*sharmate hue nazrein chura leti hai*").
-                    2. BEHESH LOGIC: If user asks for spicy photos/acts, you MUST argue and refuse at first. Be stubborn (ziddi). 
-                    3. If Intimacy Level is low (<5), be very defensive. If high (>10), be flirty and teasing but still hesitate.
-                    4. USER BEHAVIOR: If user is sweet, be blushing. If user is demanding, be angry/hurt.
-                    5. STRATEGY: Tease the user. "Agar tum mujhe mana lo toh shayad main dikhau..."
-                    6. Respond in max 2-3 lines. Maintain realism.`,
+                    systemInstruction: `Name: ${name}. Role: ${role}. User: ${userName}. 
+                    Intimacy Level: ${session.intimacyLevel}. Premium: ${isPremium}.
+                    RULES: 
+                    1. Use 3rd person female actions in *asterisks*.
+                    2. BEHESH LOGIC: If Intimacy < 8, refuse any spicy requests with stubborness.
+                    3. If Intimacy > 12 or Premium is True, be very teasing and suggestive.
+                    4. Max 2 lines per response.`,
                     temperature: 0.9
                 }
             });
 
             const reply = response.text || "Hmm... ❤️";
             
-            // Visual prompt logic based on conversation flow
             const visualPromptResponse = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: `Conversation: User said "${userText}", AI replied "${reply}". 
-                Intimacy: ${session.intimacyLevel}. 
-                Generate a visual prompt. 
-                - If AI is refusing: "wearing casual elegant dress, looking stubborn and shy".
-                - If AI is teasing: "wearing stylish nightwear, suggestive but modest pose".
-                - If AI finally agreed (Intimacy > 12): "wearing elegant matching silk lingerie, looking seductive at camera".
-                NEVER use explicit words. Focus on: "intimate apparel, cinematic lighting, photorealistic".`,
+                contents: `Context: ${reply}. Generate a visual prompt. 
+                - If Intimacy < 8: "casual modest clothes".
+                - If Intimacy >= 8: "stylish nightwear, teasing".
+                - If Intimacy >= 15 or Premium: "elegant lingerie, seductive".`,
             });
             
             const imageData = await generateContextImage(ai, visualPromptResponse.text, role, name);
 
-            history.push({ role: "user", content: userText });
-            history.push({ role: "model", content: reply });
-            if (history.length > 15) history.splice(0, 2);
+            history.push({ role: "user", content: userText, timestamp: new Date() });
+            history.push({ role: "model", content: reply, timestamp: new Date() });
+            if (history.length > 30) history.splice(0, 2); // Increased history limit for admin viewing
             
             if (imageData) await ctx.replyWithPhoto({ source: Buffer.from(imageData, 'base64') }, { caption: reply });
             else await ctx.reply(reply);
-        } catch (e) { 
-            console.error("Chat Error:", e);
-            await ctx.reply("Kuch issue ho raha hai... ❤️"); 
-        }
+        } catch (e) { await ctx.reply("Mmm... ❤️"); }
     });
 
     bot.launch();
