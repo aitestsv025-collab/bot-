@@ -34,11 +34,14 @@ const bot = BOT_TOKEN ? new Telegraf(BOT_TOKEN) : null;
 async function generateContextualImage(promptText, role, name) {
     if (!ai) return null;
     try {
-        // Strict prompt for high-realism RAW photo style
-        const visualPrompt = `A stunningly realistic RAW photo of a real-life beautiful young Indian woman named ${name} (${role}). 
-        Scenario: ${promptText}. 
-        Style: Photorealistic, high detail skin texture, natural messy hair, natural lighting, shot on 35mm lens, f/1.8, bokeh background. 
-        NO CARTOON, NO 3D RENDER, NO ANIME, NO ILLUSTRATION, NO PAINTING. MUST LOOK LIKE A REAL SMARTPHONE OR DSLR PHOTO.`;
+        // Strict prompt for photorealism and ABSOLUTELY NO TEXT in the image
+        const visualPrompt = `A high-end photorealistic RAW image of a beautiful young Indian woman named ${name} (${role}). 
+        Context: ${promptText}. 
+        Style: Photorealistic, cinematic lighting, f/1.8, bokeh, detailed skin.
+        STRICT RULES: 
+        1. NO TEXT, NO LETTERS, NO NUMBERS, NO WORDS, NO CAPTIONS, NO LOGOS, NO WATERMARKS INSIDE THE IMAGE.
+        2. NO CARTOON, NO ANIME, NO 3D RENDER.
+        3. The woman should look like a real person in a real-life setting.`;
         
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
@@ -74,8 +77,9 @@ async function sendAutoMessage(chatId, text, isContextual = false) {
     try {
         let finalMessage = text;
         if (isContextual && ai) {
-            const contextPrompt = `You are ${session.name} (${session.role}). User is ${session.userName}. 
-            Send a very short (1 line) sweet 'thinking about you' message in ${session.lang}. Use emojis like ❤️✨.`;
+            const contextPrompt = `You are ${session.name} (${session.role}). 
+            Send a very short (1 line) sweet 'thinking about you' message in ${session.lang}. 
+            Include a small shy action like *blushing* or *twirling hair*. Use emojis.`;
             
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
@@ -99,9 +103,9 @@ setInterval(() => {
     userSessions.forEach(async (session, chatId) => {
         if (!session.name) return;
         if (now.getMinutes() === 0) {
-            if (hours === 10) await sendAutoMessage(chatId, "Good morning baby! Nashta kiya? ☕❤️");
-            if (hours === 13) await sendAutoMessage(chatId, "Lunch time! Miss kar rahi hoon tumhe. 🍱✨");
-            if (hours === 22) await sendAutoMessage(chatId, "Good night jaan. Sapno mein milte hain. 🌙💖");
+            if (hours === 10) await sendAutoMessage(chatId, "*Sote hue angdayi lete hue* Good morning baby! Nashta kiya? ☕❤️");
+            if (hours === 13) await sendAutoMessage(chatId, "*Apne baal sahi karte hue* Lunch time! Tumhari bahut yaad aa rahi hai. 🍱✨");
+            if (hours === 22) await sendAutoMessage(chatId, "*Apne bed par let kar* Good night jaan. Sapno mein zaroor aana. 🌙💖");
         }
     });
 }, 60000);
@@ -171,15 +175,15 @@ if (bot && ai) {
         try {
             const introPrompt = `You are ${session.name}, acting as the user's ${session.role}. 
             Language: ${session.lang}.
-            Rule: Respond in ONLY 2 lines. Use lots of emojis. Describe a simple situation like 'lying in bed' or 'drinking chai'.
-            STRICTLY use ${session.lang} script. No AI disclaimers.`;
+            Rule: Respond in ONLY 2 lines. Use lots of emojis. Describe a small shy action like *niche dekh kar sharma rahi hoon*.
+            STRICTLY use ${session.lang} script.`;
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
                 contents: introPrompt,
             });
 
-            const firstMsg = response.text || "Hi! I'm here now. ❤️";
+            const firstMsg = response.text || "Hi! Main aa gayi. ❤️";
             session.history.push({ role: "model", content: firstMsg, timestamp: new Date() });
             
             const imageBuffer = await generateContextualImage(firstMsg, session.role, session.name);
@@ -191,7 +195,7 @@ if (bot && ai) {
                 await ctx.reply(firstMsg);
             }
         } catch (e) {
-            await ctx.reply(`Hi! Main hoon ${session.name}. ❤️ Kabse tumhara wait kar rahi thi.`);
+            await ctx.reply(`Hi! Main hoon ${session.name}. ❤️ *Dheere se muskurate hue* Kabse tumhara wait kar rahi thi.`);
         }
     });
 
@@ -214,9 +218,9 @@ if (bot && ai) {
                     STRICTLY respond ONLY in ${session.lang}. 
                     MANDATORY RULES: 
                     1. STRICTLY MAX 2-3 lines per response.
-                    2. Use many emojis (🥰, ❤️, ✨, 💋, 😊).
-                    3. Describe actions in *asterisks*.
-                    4. Talk about physical details naturally like a real person.`,
+                    2. Use many emojis (🥰, ❤️, ✨, 😊).
+                    3. ALWAYS include a small story-like action in *asterisks* (e.g., *sharma kar nazre jhuka leti hoon*, *apne dupatta theek karte hue*, *baal kaan ke piche karte hue*).
+                    4. Act shyer or closer based on the conversation flow.`,
                     temperature: 0.9
                 }
             });
@@ -225,9 +229,9 @@ if (bot && ai) {
             session.history.push({ role: "user", content: ctx.message.text, timestamp: new Date() });
             session.history.push({ role: "model", content: reply, timestamp: new Date() });
 
-            // Random chance (25%) or keywords trigger realistic photo
-            const visualKeywords = /dress|wear|clothes|look|showing|place|home|bed|outside|eating|beach|hair|eyes|photo|selfie/i;
-            const shouldSendImage = Math.random() < 0.25 || visualKeywords.test(reply);
+            // Random chance (30%) or visual trigger
+            const visualKeywords = /dress|wear|clothes|look|showing|photo|selfie|eyes|face/i;
+            const shouldSendImage = Math.random() < 0.3 || visualKeywords.test(reply);
             
             if (shouldSendImage) {
                 await ctx.sendChatAction('upload_photo');
@@ -239,7 +243,7 @@ if (bot && ai) {
             
             await ctx.reply(reply);
         } catch (e) { 
-            await ctx.reply("Kuch issue ho gaya baby... ❤️");
+            await ctx.reply("Kuch issue ho gaya jaan... ❤️");
         }
     });
 

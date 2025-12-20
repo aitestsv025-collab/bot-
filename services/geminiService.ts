@@ -17,21 +17,22 @@ export class GeminiBotService {
     if (!this.ai) return;
 
     const emojiRule = " Use frequent and expressive emojis (❤️, ✨, 🥰, 😊).";
+    const shyRule = " ALWAYS include a small situational action in *asterisks* like *blushing* or *looking away shyly*.";
     let langInstruction = "";
     
     switch(config.language) {
       case 'Tamil':
-        langInstruction = "STRICTLY speak ONLY in Tamil language script." + emojiRule;
+        langInstruction = "STRICTLY speak ONLY in Tamil script." + emojiRule + shyRule;
         break;
       case 'Hindi':
-        langInstruction = "STRICTLY speak ONLY in Hindi Devanagari." + emojiRule;
+        langInstruction = "STRICTLY speak ONLY in Hindi Devanagari." + emojiRule + shyRule;
         break;
       case 'Hinglish':
-        langInstruction = "STRICTLY speak ONLY in Hinglish (Roman script)." + emojiRule;
+        langInstruction = "STRICTLY speak ONLY in Hinglish (Roman script)." + emojiRule + shyRule;
         break;
       case 'English':
       default:
-        langInstruction = "STRICTLY speak ONLY in English." + emojiRule;
+        langInstruction = "STRICTLY speak ONLY in English." + emojiRule + shyRule;
         break;
     }
 
@@ -39,14 +40,13 @@ export class GeminiBotService {
       You are an AI character acting as the user's ${config.name}.
       Your name is ${config.name}.
       Your personality is: ${config.personality}.
-      Current Mood: ${config.mood}.
       Preferred Language: ${config.language}.
       
       Instructions:
       1. Speak naturally like a real human. Use frequent emojis.
       2. ${langInstruction}
-      3. Be caring, supportive, and use *asterisks* for actions like *smiling*.
-      4. Keep responses concise and engaging.
+      3. MANDATORY: STRICTLY MAX 2-3 lines per response. No long text.
+      4. Always describe actions in *asterisks* to create a continuous story.
       5. Do not mention being an AI.
     `;
 
@@ -66,7 +66,7 @@ export class GeminiBotService {
 
     try {
       const result: GenerateContentResponse = await this.chat.sendMessage({ message: text });
-      return result.text || "Mmm... ❤️✨";
+      return result.text || "Mmm... *nazre jhuka leti hoon* ❤️✨";
     } catch (error: any) {
       return "Something went wrong. ❤️";
     }
