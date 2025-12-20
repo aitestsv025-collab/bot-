@@ -135,7 +135,7 @@ if (bot && ai) {
         return ctx.reply(`Great! Ab apni language select karein (Select language):`, 
             Markup.inlineKeyboard([
                 [Markup.button.callback('🇮🇳 Hindi', 'lang_Hindi'), Markup.button.callback('🅰️ English', 'lang_English')],
-                [Markup.button.callback('💬 Hinglish', 'lang_Hinglish')]
+                [Markup.button.callback('💬 Hinglish', 'lang_Hinglish'), Markup.button.callback('🕉️ Tamil', 'lang_Tamil')]
             ])
         );
     });
@@ -156,7 +156,8 @@ if (bot && ai) {
             const introPrompt = `You are ${session.name}, acting as a ${session.role}. 
             Preferred Language: ${session.lang}.
             The user just started a chat. Generate a very romantic/engaging first message or a small 'story-like' opening (2-3 lines) to start the conversation. 
-            Keep it sweet, natural, and immersive. Don't mention you are an AI.`;
+            Keep it sweet, natural, and immersive. Don't mention you are an AI. 
+            If language is Tamil, respond ONLY in Tamil. If language is Hinglish, use Roman script with Hindi words.`;
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
@@ -167,7 +168,9 @@ if (bot && ai) {
             session.history.push({ role: "model", content: firstMsg, timestamp: new Date() });
             return ctx.reply(firstMsg);
         } catch (e) {
-            const fallback = session.lang === 'English' ? `Hi! I'm ${session.name}. ❤️ I've been waiting for you.` : `Hi! Main hoon ${session.name}. ❤️ Kabse tumhara wait kar rahi thi.`;
+            let fallback = `Hi! I'm ${session.name}. ❤️ I've been waiting for you.`;
+            if (session.lang === 'Hindi') fallback = `Hi! Main hoon ${session.name}. ❤️ Kabse tumhara wait kar rahi thi.`;
+            if (session.lang === 'Tamil') fallback = `வணக்கம்! நான் ${session.name}. ❤️ உங்களுக்காக காத்திருந்தேன்.`;
             return ctx.reply(fallback);
         }
     });
@@ -190,7 +193,8 @@ if (bot && ai) {
                     systemInstruction: `You are ${session.name}, a caring ${session.role}. 
                     STRICTLY respond ONLY in ${session.lang} language. 
                     Be deeply personal, use emojis, and act as a real human partner. 
-                    If language is Hinglish, use Roman script with Hindi words.`,
+                    If language is Hinglish, use Roman script with Hindi words.
+                    If language is Tamil, use proper Tamil script.`,
                     temperature: 0.9
                 }
             });
