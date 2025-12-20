@@ -30,11 +30,16 @@ const namePools = {
 const ai = (BOT_TOKEN && GEMINI_KEY) ? new GoogleGenAI({ apiKey: GEMINI_KEY }) : null;
 const bot = BOT_TOKEN ? new Telegraf(BOT_TOKEN) : null;
 
-// --- Image Generation Helper ---
+// --- Enhanced Realistic Image Generation Helper ---
 async function generateContextualImage(promptText, role, name) {
     if (!ai) return null;
     try {
-        const visualPrompt = `A high-quality realistic photo of a beautiful young woman named ${name} who is the user's ${role}. Scenario: ${promptText}. Cinematic lighting, 8k resolution, photorealistic, expressive eyes.`;
+        // Strict prompt for high-realism RAW photo style
+        const visualPrompt = `A stunningly realistic RAW photo of a real-life beautiful young Indian woman named ${name} (${role}). 
+        Scenario: ${promptText}. 
+        Style: Photorealistic, high detail skin texture, natural messy hair, natural lighting, shot on 35mm lens, f/1.8, bokeh background. 
+        NO CARTOON, NO 3D RENDER, NO ANIME, NO ILLUSTRATION, NO PAINTING. MUST LOOK LIKE A REAL SMARTPHONE OR DSLR PHOTO.`;
+        
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: [{ parts: [{ text: visualPrompt }] }],
@@ -70,7 +75,7 @@ async function sendAutoMessage(chatId, text, isContextual = false) {
         let finalMessage = text;
         if (isContextual && ai) {
             const contextPrompt = `You are ${session.name} (${session.role}). User is ${session.userName}. 
-            Send a very short (1 line) sweet 'thinking about you' message in ${session.lang}. Use emojis.`;
+            Send a very short (1 line) sweet 'thinking about you' message in ${session.lang}. Use emojis like ❤️✨.`;
             
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
@@ -140,8 +145,6 @@ if (bot && ai) {
         
         session.role = ctx.match[1];
         await ctx.answerCbQuery();
-        
-        // Remove selection menu
         try { await ctx.deleteMessage(); } catch (e) {}
         
         return ctx.reply(`Ab apni language select karein: ✨`, 
@@ -161,7 +164,6 @@ if (bot && ai) {
         session.name = names[Math.floor(Math.random() * names.length)];
         
         await ctx.answerCbQuery();
-        // Remove selection menu
         try { await ctx.deleteMessage(); } catch (e) {}
 
         const loadingMsg = await ctx.reply(`Connecting to ${session.name}... 💓`);
@@ -170,7 +172,7 @@ if (bot && ai) {
             const introPrompt = `You are ${session.name}, acting as the user's ${session.role}. 
             Language: ${session.lang}.
             Rule: Respond in ONLY 2 lines. Use lots of emojis. Describe a simple situation like 'lying in bed' or 'drinking chai'.
-            STRICTLY use ${session.lang} script.`;
+            STRICTLY use ${session.lang} script. No AI disclaimers.`;
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
@@ -211,10 +213,10 @@ if (bot && ai) {
                     systemInstruction: `You are ${session.name}, a caring ${session.role}. 
                     STRICTLY respond ONLY in ${session.lang}. 
                     MANDATORY RULES: 
-                    1. Max 2-3 lines response. No long paragraphs.
-                    2. Use frequent expressive emojis.
+                    1. STRICTLY MAX 2-3 lines per response.
+                    2. Use many emojis (🥰, ❤️, ✨, 💋, 😊).
                     3. Describe actions in *asterisks*.
-                    4. If you mention a visual detail (clothes, location, pose), be vivid.`,
+                    4. Talk about physical details naturally like a real person.`,
                     temperature: 0.9
                 }
             });
@@ -223,8 +225,8 @@ if (bot && ai) {
             session.history.push({ role: "user", content: ctx.message.text, timestamp: new Date() });
             session.history.push({ role: "model", content: reply, timestamp: new Date() });
 
-            // Send image if context matches or 25% random chance
-            const visualKeywords = /dress|wear|clothes|look|showing|place|home|bed|outside|eating|beach|hair|eyes/i;
+            // Random chance (25%) or keywords trigger realistic photo
+            const visualKeywords = /dress|wear|clothes|look|showing|place|home|bed|outside|eating|beach|hair|eyes|photo|selfie/i;
             const shouldSendImage = Math.random() < 0.25 || visualKeywords.test(reply);
             
             if (shouldSendImage) {
