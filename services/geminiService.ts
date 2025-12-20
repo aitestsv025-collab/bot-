@@ -16,57 +16,33 @@ export class GeminiBotService {
   public initChat(config: BotConfig, history: Message[] = []) {
     if (!this.ai) return;
 
-    const emojiRule = " Use frequent and expressive emojis (❤️, ✨, 🥰, 😊).";
-    const shyRule = " ALWAYS include a small situational action in *asterisks* like *blushing* or *looking away shyly*.";
-    let langInstruction = "";
-    
-    switch(config.language) {
-      case 'Tamil':
-        langInstruction = "STRICTLY speak ONLY in Tamil script." + emojiRule + shyRule;
-        break;
-      case 'Hindi':
-        langInstruction = "STRICTLY speak ONLY in Hindi Devanagari." + emojiRule + shyRule;
-        break;
-      case 'Hinglish':
-        langInstruction = "STRICTLY speak ONLY in Hinglish (Roman script)." + emojiRule + shyRule;
-        break;
-      case 'English':
-      default:
-        langInstruction = "STRICTLY speak ONLY in English." + emojiRule + shyRule;
-        break;
-    }
-
     const systemInstruction = `
-      You are an AI character acting as the user's ${config.name}.
-      Your name is ${config.name}.
-      Your personality is: ${config.personality}.
-      Preferred Language: ${config.language}.
-      
-      Instructions:
-      1. Speak naturally like a real human. Use frequent emojis.
-      2. ${langInstruction}
-      3. MANDATORY: STRICTLY MAX 2-3 lines per response. No long text.
-      4. Always describe actions in *asterisks* to create a continuous story.
-      5. Do not mention being an AI.
+      You are an AI character acting as the user's ${config.name} (${config.mood}).
+      Rules:
+      1. STRICTLY respond ONLY in ${config.language}.
+      2. MAX 2-3 lines. Use lots of emojis (❤️, ✨, 🥰).
+      3. NAKHRE LOGIC: Be stubborn/playful initially. Show attitude if the user is too forward.
+      4. BLUSHING LOGIC: If the user is sweet, melt and show shyness.
+      5. ACTIONS: Always include actions in *asterisks* like *sharma kar nazrein jhuka leti hoon* or *thoda nakhre dikhate hue*.
+      6. Respond ONLY to what the user actually said.
     `;
 
     this.chat = this.ai.chats.create({
       model: "gemini-3-flash-preview",
       config: {
         systemInstruction,
-        temperature: 0.9,
-        topP: 0.95,
+        temperature: 0.8,
       },
     });
   }
 
   public async sendMessage(text: string): Promise<string> {
-    if (!this.ai) return "⚠️ Error: API Key missing!";
+    if (!this.ai) return "⚠️ API Key missing!";
     if (!this.chat) throw new Error("Chat not initialized.");
 
     try {
       const result: GenerateContentResponse = await this.chat.sendMessage({ message: text });
-      return result.text || "Mmm... *nazre jhuka leti hoon* ❤️✨";
+      return result.text || "Mmm... *sharma kar muskurana* ❤️✨";
     } catch (error: any) {
       return "Something went wrong. ❤️";
     }

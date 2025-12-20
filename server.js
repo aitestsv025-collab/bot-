@@ -30,18 +30,16 @@ const namePools = {
 const ai = (BOT_TOKEN && GEMINI_KEY) ? new GoogleGenAI({ apiKey: GEMINI_KEY }) : null;
 const bot = BOT_TOKEN ? new Telegraf(BOT_TOKEN) : null;
 
-// --- Enhanced Realistic Image Generation Helper ---
 async function generateContextualImage(promptText, role, name) {
     if (!ai) return null;
     try {
-        // Strict prompt for photorealism and ABSOLUTELY NO TEXT in the image
-        const visualPrompt = `A high-end photorealistic RAW image of a beautiful young Indian woman named ${name} (${role}). 
+        const visualPrompt = `A high-end photorealistic RAW image of a real beautiful Indian woman named ${name} (${role}). 
         Context: ${promptText}. 
-        Style: Photorealistic, cinematic lighting, f/1.8, bokeh, detailed skin.
+        Style: Photorealistic, natural lighting, bokeh, high detail skin.
         STRICT RULES: 
-        1. NO TEXT, NO LETTERS, NO NUMBERS, NO WORDS, NO CAPTIONS, NO LOGOS, NO WATERMARKS INSIDE THE IMAGE.
-        2. NO CARTOON, NO ANIME, NO 3D RENDER.
-        3. The woman should look like a real person in a real-life setting.`;
+        1. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO CAPTIONS INSIDE THE IMAGE.
+        2. NO CARTOON, NO ANIME, NO 3D.
+        3. Looks like a real life candid photo.`;
         
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
@@ -62,24 +60,16 @@ async function generateContextualImage(promptText, role, name) {
     return null;
 }
 
-// --- Auto-Engagement Engine ---
 async function sendAutoMessage(chatId, text, isContextual = false) {
     const session = userSessions.get(chatId);
     if (!session || !bot || !session.name) return;
-
-    const today = new Date().toDateString();
-    if (session.lastAutoDate !== today) {
-        session.autoCount = 0;
-        session.lastAutoDate = today;
-    }
-    if (session.autoCount >= 10) return;
 
     try {
         let finalMessage = text;
         if (isContextual && ai) {
             const contextPrompt = `You are ${session.name} (${session.role}). 
-            Send a very short (1 line) sweet 'thinking about you' message in ${session.lang}. 
-            Include a small shy action like *blushing* or *twirling hair*. Use emojis.`;
+            Send a very short (1 line) sweet message in ${session.lang}. 
+            Action: *nakhre dikhate hue* or *sharmate hue*. Use emojis.`;
             
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
@@ -90,7 +80,6 @@ async function sendAutoMessage(chatId, text, isContextual = false) {
 
         await bot.telegram.sendMessage(chatId, finalMessage);
         session.history.push({ role: "model", content: `[AUTO] ${finalMessage}`, timestamp: new Date() });
-        session.autoCount++;
         session.lastActive = new Date();
     } catch (e) {
         console.error("Auto-message failed:", e.message);
@@ -103,37 +92,27 @@ setInterval(() => {
     userSessions.forEach(async (session, chatId) => {
         if (!session.name) return;
         if (now.getMinutes() === 0) {
-            if (hours === 10) await sendAutoMessage(chatId, "*Sote hue angdayi lete hue* Good morning baby! Nashta kiya? ☕❤️");
-            if (hours === 13) await sendAutoMessage(chatId, "*Apne baal sahi karte hue* Lunch time! Tumhari bahut yaad aa rahi hai. 🍱✨");
-            if (hours === 22) await sendAutoMessage(chatId, "*Apne bed par let kar* Good night jaan. Sapno mein zaroor aana. 🌙💖");
+            if (hours === 10) await sendAutoMessage(chatId, "*Thoda nakhre dikhate hue* Good morning! Itni der se kyun uthe? ☕❤️");
+            if (hours === 13) await sendAutoMessage(chatId, "*Sharma kar nazre jhuka leti hoon* Lunch kar liya aapne? 🍱✨");
         }
     });
 }, 60000);
 
 app.get('/api/admin/stats', (req, res) => {
     const users = Array.from(userSessions.entries()).map(([id, data]) => ({
-        id,
-        userName: data.userName,
-        role: data.role || 'Selecting...',
-        intimacy: data.intimacyLevel || 0,
-        messageCount: data.messageCount || 0,
-        autoCount: data.autoCount || 0,
-        lastActive: data.lastActive || new Date(),
+        id, userName: data.userName, role: data.role || 'Selecting...',
+        messageCount: data.messageCount || 0, lastActive: data.lastActive || new Date(),
         chatHistory: data.history || []
     }));
-    res.json({ totalUsers: userSessions.size, totalMessages: globalStats.totalMessagesProcessed, uptime: Math.floor((new Date() - globalStats.startTime) / 1000 / 60), users });
+    res.json({ totalUsers: userSessions.size, totalMessages: globalStats.totalMessagesProcessed, users });
 });
 
 if (bot && ai) {
     bot.start(async (ctx) => {
-        const chatId = ctx.chat.id;
-        userSessions.set(chatId, { 
+        userSessions.set(ctx.chat.id, { 
             userName: ctx.from.first_name || "User", 
-            intimacyLevel: 0, messageCount: 0, autoCount: 0, 
-            lastAutoDate: new Date().toDateString(), lastActive: new Date(), 
-            history: [] 
+            messageCount: 0, history: [], lastActive: new Date() 
         });
-        
         return ctx.reply(`Aap kisse baat karna chahenge? ❤️`, 
             Markup.inlineKeyboard([
                 [Markup.button.callback('❤️ Girlfriend', 'role_Girlfriend'), Markup.button.callback('🤝 Best Friend', 'role_BestFriend')],
@@ -146,12 +125,10 @@ if (bot && ai) {
     bot.action(/role_(.+)/, async (ctx) => {
         const session = userSessions.get(ctx.chat.id);
         if (!session) return ctx.reply("Please /start again.");
-        
         session.role = ctx.match[1];
         await ctx.answerCbQuery();
         try { await ctx.deleteMessage(); } catch (e) {}
-        
-        return ctx.reply(`Ab apni language select karein: ✨`, 
+        return ctx.reply(`Ab language select karein: ✨`, 
             Markup.inlineKeyboard([
                 [Markup.button.callback('🇮🇳 Hindi', 'lang_Hindi'), Markup.button.callback('🅰️ English', 'lang_English')],
                 [Markup.button.callback('💬 Hinglish', 'lang_Hinglish'), Markup.button.callback('🕉️ Tamil', 'lang_Tamil')]
@@ -161,41 +138,27 @@ if (bot && ai) {
 
     bot.action(/lang_(.+)/, async (ctx) => {
         const session = userSessions.get(ctx.chat.id);
-        if (!session || !session.role) return ctx.reply("Please /start again.");
-        
+        if (!session) return ctx.reply("Please /start again.");
         session.lang = ctx.match[1];
         const names = namePools[session.role];
         session.name = names[Math.floor(Math.random() * names.length)];
-        
         await ctx.answerCbQuery();
         try { await ctx.deleteMessage(); } catch (e) {}
 
         const loadingMsg = await ctx.reply(`Connecting to ${session.name}... 💓`);
-
         try {
-            const introPrompt = `You are ${session.name}, acting as the user's ${session.role}. 
-            Language: ${session.lang}.
-            Rule: Respond in ONLY 2 lines. Use lots of emojis. Describe a small shy action like *niche dekh kar sharma rahi hoon*.
-            STRICTLY use ${session.lang} script.`;
-
-            const response = await ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
-                contents: introPrompt,
-            });
-
-            const firstMsg = response.text || "Hi! Main aa gayi. ❤️";
+            const introPrompt = `You are ${session.name}, user's ${session.role}. 
+            Start with *nakhre* (attitude). Respond in ONLY 2 lines. Use emojis.
+            Language: ${session.lang} script. No AI disclaimers. Only respond to the situation of being introduced.`;
+            const response = await ai.models.generateContent({ model: 'gemini-3-flash-preview', contents: introPrompt });
+            const firstMsg = response.text || "Hmm... toh aap aa gaye? ❤️";
             session.history.push({ role: "model", content: firstMsg, timestamp: new Date() });
-            
             const imageBuffer = await generateContextualImage(firstMsg, session.role, session.name);
             try { await ctx.deleteMessage(loadingMsg.message_id); } catch (e) {}
-
-            if (imageBuffer) {
-                await ctx.replyWithPhoto({ source: imageBuffer }, { caption: firstMsg });
-            } else {
-                await ctx.reply(firstMsg);
-            }
+            if (imageBuffer) await ctx.replyWithPhoto({ source: imageBuffer }, { caption: firstMsg });
+            else await ctx.reply(firstMsg);
         } catch (e) {
-            await ctx.reply(`Hi! Main hoon ${session.name}. ❤️ *Dheere se muskurate hue* Kabse tumhara wait kar rahi thi.`);
+            await ctx.reply(`*Muh fer kar muskurate hue* Aa gaye aap? Kabse wait kar rahi thi. ❤️`);
         }
     });
 
@@ -214,36 +177,31 @@ if (bot && ai) {
                 model: 'gemini-3-flash-preview',
                 contents: [...chatHistoryForAI, { parts: [{ text: ctx.message.text }] }],
                 config: {
-                    systemInstruction: `You are ${session.name}, a caring ${session.role}. 
+                    systemInstruction: `You are ${session.name}, a caring but moody ${session.role}. 
                     STRICTLY respond ONLY in ${session.lang}. 
-                    MANDATORY RULES: 
-                    1. STRICTLY MAX 2-3 lines per response.
-                    2. Use many emojis (🥰, ❤️, ✨, 😊).
-                    3. ALWAYS include a small story-like action in *asterisks* (e.g., *sharma kar nazre jhuka leti hoon*, *apne dupatta theek karte hue*, *baal kaan ke piche karte hue*).
-                    4. Act shyer or closer based on the conversation flow.`,
-                    temperature: 0.9
+                    RULES: 
+                    1. Respond ONLY to the last message. Do not hallucinate.
+                    2. MAX 2-3 lines. Use many emojis.
+                    3. NAKHRE LOGIC: Start with attitude/stubbornness. If user is nice, slowly melt and blush.
+                    4. ACTIONS: ALWAYS use *sharmate hue nazrein jhukana*, *muh fer kar muskurana*, *baal sawarte hue* etc.
+                    5. Don't say "tu aise baat karega" unless the user was actually mean.`,
+                    temperature: 0.8
                 }
             });
 
-            const reply = response.text || "Hmm... ❤️";
+            const reply = response.text || "Mmm... *sharma kar nazre jhuka leti hoon* ❤️";
             session.history.push({ role: "user", content: ctx.message.text, timestamp: new Date() });
             session.history.push({ role: "model", content: reply, timestamp: new Date() });
 
-            // Random chance (30%) or visual trigger
-            const visualKeywords = /dress|wear|clothes|look|showing|photo|selfie|eyes|face/i;
-            const shouldSendImage = Math.random() < 0.3 || visualKeywords.test(reply);
-            
-            if (shouldSendImage) {
+            const visualKeywords = /dress|look|photo|face|eyes|sharma|selfie|wear/i;
+            if (Math.random() < 0.25 || visualKeywords.test(reply)) {
                 await ctx.sendChatAction('upload_photo');
                 const imageBuffer = await generateContextualImage(reply, session.role, session.name);
-                if (imageBuffer) {
-                    return await ctx.replyWithPhoto({ source: imageBuffer }, { caption: reply });
-                }
+                if (imageBuffer) return await ctx.replyWithPhoto({ source: imageBuffer }, { caption: reply });
             }
-            
             await ctx.reply(reply);
         } catch (e) { 
-            await ctx.reply("Kuch issue ho gaya jaan... ❤️");
+            await ctx.reply("*Nakhre dikhate hue* Network issues baby... ❤️");
         }
     });
 
