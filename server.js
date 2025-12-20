@@ -19,20 +19,18 @@ const globalStats = {
 };
 
 /**
- * --- GUIDE FOR CUSTOM IMAGES (NSFW/BOLD) ---
- * 1. Upload your images to a GitHub repo.
- * 2. Get the RAW link (it looks like: https://raw.githubusercontent.com/user/repo/main/image.jpg).
- * 3. Add those links to the arrays below for each role.
+ * --- CUSTOM IMAGE LINKS YAHAN DALEIN ---
+ * Example: 'https://raw.githubusercontent.com/AapkaUser/Repo/main/photo.jpg'
  */
 const NSFW_ASSETS = {
     'Girlfriend': [
-        // 'https://raw.githubusercontent.com/username/repo/main/gf_hot.jpg',
+        // Yahan GF ki hot photos ke links dalein
     ],
     'Aunty': [
-        // 'https://raw.githubusercontent.com/username/repo/main/aunty_bold.jpg',
+        // Yahan Aunty ki spicy photos ke links dalein
     ],
     'Teacher': [
-        // 'https://raw.githubusercontent.com/username/repo/main/teacher_sexy.jpg',
+        // Yahan Teacher ki seductive photos ke links dalein
     ],
     'StepMom': [],
     'StepSister': []
@@ -236,20 +234,19 @@ if (bot && ai) {
             session.history.push({ role: "model", content: reply, timestamp: new Date() });
 
             const lowerText = ctx.message.text.toLowerCase();
-            const visualKeywords = /dress|look|photo|face|eyes|selfie|wear|garmi|akeli|room|night|shower|nude|sexy|hot|bistar|sex|dick|pussy|breast|show|bhejo/i;
+            const visualKeywords = /dress|look|photo|face|eyes|selfie|wear|garmi|akeli|room|night|shower|nude|sexy|hot|bistar|sex|dick|pussy|breast|show|bhejo|utaro|nangi/i;
             const isSeductiveResponse = reply.includes("🔥") || reply.includes("🫦") || reply.includes("hot") || reply.includes("naughty");
 
             if (Math.random() < 0.5 || visualKeywords.test(lowerText) || visualKeywords.test(reply)) {
                 await ctx.sendChatAction('upload_photo');
                 
-                // PRIORITY: Use GitHub Images for Bold/Explicit Keywords
                 const customAssets = NSFW_ASSETS[session.role] || [];
-                if (customAssets.length > 0 && (visualKeywords.test(lowerText) || visualKeywords.test(reply))) {
+                // AGGRESSIVE TRIGGER: If user asks for something bold, try custom assets first
+                if (customAssets.length > 0 && (visualKeywords.test(lowerText) || lowerText.includes("dikhao"))) {
                     const randomImg = customAssets[Math.floor(Math.random() * customAssets.length)];
                     return await ctx.replyWithPhoto(randomImg, { caption: reply });
                 }
 
-                // SECONDARY: Try Gemini AI Image Generation
                 const emotion = isSeductiveResponse ? "naughty facial expression, desire" : "playful, messy hair";
                 const scene = isSeductiveResponse ? "Private bedroom" : "Cozy home";
                 const imageBuffer = await generateContextualImage(scene, emotion, session);
