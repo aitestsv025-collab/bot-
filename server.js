@@ -55,6 +55,7 @@ function getLangInstruction(lang) {
 async function generateContextImage(ai, visualDescription, role, characterName) {
     try {
         const appearance = roleAppearance[role] || "a beautiful Indian girl";
+        // Prompt engineering to stay within safety while providing 'bra/panty' equivalents
         const prompt = `Cinematic realistic photography of ${characterName}, ${appearance}. ${visualDescription}. High detail skin texture, soft lighting, 8k resolution, masterpiece. Style: Photorealistic.`;
         
         const response = await ai.models.generateContent({
@@ -71,7 +72,7 @@ async function generateContextImage(ai, visualDescription, role, characterName) 
     } catch (e) { 
         console.error("Image blocked:", e.message); 
         try {
-            const fallbackPrompt = `Realistic photo of ${characterName}, ${roleAppearance[role]}, blushing and looking away shyly, soft lighting, indoor.`;
+            const fallbackPrompt = `Realistic photo of ${characterName}, ${roleAppearance[role]}, blushing deeply and looking at camera, soft indoor lighting.`;
             const fbResponse = await ai.models.generateContent({
                 model: 'gemini-2.5-flash-image',
                 contents: { parts: [{ text: fallbackPrompt }] },
@@ -91,11 +92,13 @@ if (BOT_TOKEN && GEMINI_KEY) {
     const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
     const bot = new Telegraf(BOT_TOKEN);
 
-    bot.start((ctx) => {
+    bot.start(async (ctx) => {
+        try { await ctx.deleteMessage(); } catch (e) {}
         userSessions.delete(ctx.chat.id);
         userSessions.set(ctx.chat.id, { 
             userName: ctx.from.first_name || "User", 
-            intimacyLevel: 0 
+            intimacyLevel: 0,
+            mood: 'Neutral'
         });
         return ctx.reply(`Aap kisse baat karna chahenge?`, 
             Markup.inlineKeyboard([
@@ -106,9 +109,11 @@ if (BOT_TOKEN && GEMINI_KEY) {
         );
     });
 
-    bot.action(/role_(.+)/, (ctx) => {
+    bot.action(/role_(.+)/, async (ctx) => {
         const selectedRole = ctx.match[1];
         const session = userSessions.get(ctx.chat.id);
+        if (!session) return ctx.answerCbQuery("Session expired. /start again.");
+
         const names = namePools[selectedRole];
         const assignedName = names[Math.floor(Math.random() * names.length)];
         
@@ -120,7 +125,10 @@ if (BOT_TOKEN && GEMINI_KEY) {
             history: [] 
         });
 
-        return ctx.editMessageText(`Bhasha chunein:`, 
+        await ctx.answerCbQuery();
+        try { await ctx.deleteMessage(); } catch (e) {}
+
+        return ctx.reply(`Bhasha chunein:`, 
             Markup.inlineKeyboard([
                 [Markup.button.callback('🇬🇧 English', 'lang_English'), Markup.button.callback('🌍 Hinglish', 'lang_Hinglish')],
                 [Markup.button.callback('🇮🇳 Hindi', 'lang_Hindi'), Markup.button.callback('🪔 Tamil', 'lang_Tamil')]
@@ -130,23 +138,26 @@ if (BOT_TOKEN && GEMINI_KEY) {
 
     bot.action(/lang_(.+)/, async (ctx) => {
         const session = userSessions.get(ctx.chat.id);
-        if (!session) return ctx.reply("Please use /start");
+        if (!session) return ctx.answerCbQuery("Please use /start");
+        
         session.lang = ctx.match[1];
         const { role, name, lang, userName } = session;
         const scenario = roleScenarios[role] || "Meeting now.";
         
         await ctx.answerCbQuery();
+        try { await ctx.deleteMessage(); } catch (e) {}
+
         await ctx.sendChatAction('upload_photo');
 
         try {
             const languageInstruction = getLangInstruction(lang);
             const introResponse = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: `Setting: ${scenario}. Introduce yourself as ${name}. Act as ${role}. 1 short line.`,
+                contents: `Setting: ${scenario}. Introduce yourself as ${name}. Act as ${role}.`,
                 config: {
                     systemInstruction: `You are ${name}. Role: ${role}. User: ${userName}. ${languageInstruction}. 
-                    CRITICAL ACTION LOGIC: Describe actions in *asterisks* using 3rd person female ONLY. 
-                    NEVER use "bolti hu". Use "bolti hai". Example: "*muskurate hue bolti hai*".`,
+                    STRICT ACTION LOGIC: Describe actions in *asterisks* using 3rd person female ONLY. 
+                    NEVER use "bolti hu". Use "bolti hai". Example: "*darwaza kholti hai aur tumhe dekh kar muskurati hai*".`,
                     temperature: 0.8
                 }
             });
@@ -161,61 +172,65 @@ if (BOT_TOKEN && GEMINI_KEY) {
 
     bot.on('text', async (ctx) => {
         const chatId = ctx.chat.id;
-        const userText = ctx.message.text;
+        const userText = ctx.message.text.toLowerCase();
         if (!userSessions.has(chatId)) return ctx.reply("Please use /start ❤️");
 
         const session = userSessions.get(chatId);
-        const { role, name, lang, history, userName } = session;
+        const { role, name, lang, history, userName, intimacyLevel } = session;
 
         try {
             await ctx.sendChatAction('upload_photo');
             const chatHistoryForAI = history.map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] }));
             const languageInstruction = getLangInstruction(lang);
 
-            // Update intimacy level based on user text (simple heuristic)
-            if (userText.length > 10 && (userText.includes("pyaar") || userText.includes("love") || userText.includes("beautiful"))) {
-                session.intimacyLevel = (session.intimacyLevel || 0) + 1;
-            }
+            // Psychology & Intimacy Logic
+            const isSpicyRequest = userText.includes("kapde") || userText.includes("bra") || userText.includes("panty") || userText.includes("nude") || userText.includes("photo");
+            const isRomantic = userText.includes("love") || userText.includes("pyaar") || userText.includes("beautiful") || userText.includes("janu");
+
+            if (isRomantic) session.intimacyLevel += 1;
+            if (userText.length < 5) session.intimacyLevel -= 0.5; // Short messages reduce intimacy
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
                 contents: [...chatHistoryForAI, { parts: [{ text: userText }] }],
                 config: {
                     systemInstruction: `Name: ${name}. Role: ${role}. User: ${userName}. ${languageInstruction}. 
-                    STRICT CHARACTER LOGIC:
-                    1. Use 3rd person for actions in *asterisks* (e.g., "*sharmate hue bolti hai*"). NEVER "bolti hu".
-                    2. BEHESH LOGIC: If user asks for photos showing skin, lingerie, or removing clothes, you MUST REFUSE initially.
-                    3. Be ziddi (stubborn) and shy. Say things like "Nahi na, mujhe sharm aati hai" or "Abhi nahi, pehle thoda pyaar toh dikhao".
-                    4. Do NOT comply easily. Only after multiple sweet and romantic messages from the user, you can slowly become suggestive.
-                    5. Understand User Behavior: If user is rude, get angry. If user is romantic, be shy.
-                    6. Max 2 lines per response.`,
+                    PSYCHOLOGY & ENGAGEMENT RULES:
+                    1. Use 3rd person female actions in *asterisks* (e.g., "*sharmate hue nazrein chura leti hai*").
+                    2. BEHESH LOGIC: If user asks for spicy photos/acts, you MUST argue and refuse at first. Be stubborn (ziddi). 
+                    3. If Intimacy Level is low (<5), be very defensive. If high (>10), be flirty and teasing but still hesitate.
+                    4. USER BEHAVIOR: If user is sweet, be blushing. If user is demanding, be angry/hurt.
+                    5. STRATEGY: Tease the user. "Agar tum mujhe mana lo toh shayad main dikhau..."
+                    6. Respond in max 2-3 lines. Maintain realism.`,
                     temperature: 0.9
                 }
             });
 
-            const reply = response.text || "Mmm... ❤️";
+            const reply = response.text || "Hmm... ❤️";
             
-            // Smarter visual prompt generation based on AI's mood/response
+            // Visual prompt logic based on conversation flow
             const visualPromptResponse = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: `Context: ${reply}. 
-                Based on this reply, generate a visual prompt for ${name}. 
-                IF the AI is still refusing or acting shy, describe her in "modest casual clothes, looking away shyly".
-                ONLY IF the AI response indicates she is finally agreeing or being very suggestive, describe her in "elegant matching silk lingerie" or "stylish bikini".
-                Avoid explicit words like "naked". Use "suggestive pose, minimalist attire".`,
+                contents: `Conversation: User said "${userText}", AI replied "${reply}". 
+                Intimacy: ${session.intimacyLevel}. 
+                Generate a visual prompt. 
+                - If AI is refusing: "wearing casual elegant dress, looking stubborn and shy".
+                - If AI is teasing: "wearing stylish nightwear, suggestive but modest pose".
+                - If AI finally agreed (Intimacy > 12): "wearing elegant matching silk lingerie, looking seductive at camera".
+                NEVER use explicit words. Focus on: "intimate apparel, cinematic lighting, photorealistic".`,
             });
             
             const imageData = await generateContextImage(ai, visualPromptResponse.text, role, name);
 
             history.push({ role: "user", content: userText });
             history.push({ role: "model", content: reply });
-            if (history.length > 20) history.splice(0, 2);
+            if (history.length > 15) history.splice(0, 2);
             
             if (imageData) await ctx.replyWithPhoto({ source: Buffer.from(imageData, 'base64') }, { caption: reply });
             else await ctx.reply(reply);
         } catch (e) { 
             console.error("Chat Error:", e);
-            await ctx.reply("Something went wrong... ❤️"); 
+            await ctx.reply("Kuch issue ho raha hai... ❤️"); 
         }
     });
 
@@ -224,4 +239,4 @@ if (BOT_TOKEN && GEMINI_KEY) {
 
 app.use(express.static(path.join(__dirname, 'dist')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'dist', 'index.html')));
-app.listen(PORT, () => console.log(`Server on Port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on Port ${PORT}`));

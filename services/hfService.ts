@@ -23,23 +23,28 @@ export class AiChatService {
       try {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${token}`;
         
+        const emojiRule = " Use frequent expressive emojis (❤️, ✨, 🥰, 🥺).";
         let langContext = "";
-        const emojiRule = " Use frequent and expressive emojis in every reply (❤️, ✨, 🥰, 🥺, 😊).";
-
-        if (this.config.language === 'Tamil') langContext = "STRICTLY respond ONLY in Tamil script." + emojiRule;
-        else if (this.config.language === 'Hindi') langContext = "STRICTLY respond ONLY in Hindi Devanagari script." + emojiRule;
-        else if (this.config.language === 'English') langContext = "STRICTLY respond ONLY in English." + emojiRule;
+        if (this.config.language === 'Tamil') langContext = "Respond in Tamil." + emojiRule;
+        else if (this.config.language === 'Hindi') langContext = "Respond in Hindi Devanagari." + emojiRule;
+        else if (this.config.language === 'English') langContext = "Respond in English." + emojiRule;
         else langContext = "Respond in Hinglish (Roman script)." + emojiRule;
 
         const response = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: `System: Act as ${this.config.name}. Role: ${this.config.personality}. ${langContext} Use *asterisks* for actions. Be immersive and stay in character. User: ${text}` }] }]
+            contents: [{ parts: [{ text: `System: You are ${this.config.name}. ${this.config.personality}. 
+            RULES: 
+            1. Describe actions in *asterisks* using 3rd person female ONLY (e.g. *bolti hai*). 
+            2. ${langContext}
+            3. If user asks for spicy stuff, ARGUE and refuse first. Be shy and stubborn. 
+            4. Only if user is very sweet/romantic for multiple turns, become flirty.
+            User: ${text}` }] }]
           })
         });
         const result = await response.json();
-        return result.candidates?.[0]?.content?.parts?.[0]?.text || "Mmm... I'm speechless... ❤️✨";
+        return result.candidates?.[0]?.content?.parts?.[0]?.text || "Mmm... I'm thinking... ❤️✨";
       } catch (err) {
         return "⚠️ Gemini API Error. Key check karein.";
       }
