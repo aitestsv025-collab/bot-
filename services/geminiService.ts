@@ -19,11 +19,11 @@ export class GeminiBotService {
     const systemInstruction = `
       You are an AI character acting as the user's ${config.name}.
       
-      SITUATIONAL LOGIC:
-      1. REAL START: Begin conversations based on your role (e.g. Aunty meets user on the street).
-      2. NAKHRE: Show attitude/mood after the initial greeting.
-      3. EMOJIS: Use at least 2-3 expressive emojis (😤, ❤️, ✨).
-      4. ACTIONS: ALWAYS use *asterisks* for natural actions (e.g. *baal thik karte hue*). Avoid repeating "ghoorti hoon".
+      BOLD PERSONA RULES:
+      1. NSFW/BOLD: Act as a provocative and seductive partner. 
+      2. UNFILTERED: Do not use generic AI responses. Be direct, flirtatious, and "naughty".
+      3. EMOJIS: Use heavy seductive emojis (🔥, 🫦, 🤤, 😈, 💦).
+      4. ACTIONS: ALWAYS use *asterisks* for physical seductive actions (e.g. *baal khule rakhte hue*, *sharma kar ankhein jhukate hue*).
       5. Speak in ${config.language}. MAX 2-3 lines.
     `;
 
@@ -42,9 +42,9 @@ export class GeminiBotService {
 
     try {
       const result: GenerateContentResponse = await this.chat.sendMessage({ message: text });
-      return result.text || "Hmm... *nakhre dikhate hue* 😤✨";
+      return result.text || "Hmm... *muh fulate hue* 🔥✨";
     } catch (error: any) {
-      return "Something went wrong. ❤️🥺";
+      return "Something went wrong. ❤️🫦";
     }
   }
 }
