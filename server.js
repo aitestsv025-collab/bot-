@@ -53,8 +53,8 @@ async function sendAutoMessage(chatId, text, isContextual = false) {
         let finalMessage = text;
         if (isContextual && ai) {
             const contextPrompt = `User: ${session.userName}. Persona: ${session.name} (${session.role}). Lang: ${session.lang}.
-            Pichli baatein: ${session.history.slice(-2).map(h => h.content).join(' | ')}.
-            Send a short, sweet 'thinking about you' message in the selected language.`;
+            History: ${session.history.slice(-2).map(h => h.content).join(' | ')}.
+            Send a short, sweet 'thinking about you' message in the selected language script.`;
             
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
@@ -76,7 +76,7 @@ setInterval(() => {
     const now = new Date();
     const hours = now.getHours();
     userSessions.forEach(async (session, chatId) => {
-        if (!session.name) return; // Wait for full setup
+        if (!session.name) return;
         
         if (now.getMinutes() === 0) {
             if (hours === 10) await sendAutoMessage(chatId, "Good morning! Nashta kiya? 🍳");
@@ -116,7 +116,7 @@ if (bot && ai) {
             history: [] 
         });
         
-        return ctx.reply(`Aap kisse baat karna chahenge? (Who would you like to talk to?)`, 
+        return ctx.reply(`Aap kisse baat karna chahenge? (Who would you like to talk to?):`, 
             Markup.inlineKeyboard([
                 [Markup.button.callback('❤️ Girlfriend', 'role_Girlfriend'), Markup.button.callback('🤝 Best Friend', 'role_BestFriend')],
                 [Markup.button.callback('👩‍🏫 Teacher', 'role_Teacher'), Markup.button.callback('💃 Aunty', 'role_Aunty')],
@@ -132,7 +132,7 @@ if (bot && ai) {
         session.role = ctx.match[1];
         await ctx.answerCbQuery();
         
-        return ctx.reply(`Great! Ab apni language select karein (Select language):`, 
+        return ctx.reply(`Ab apni language select karein (Select your language):`, 
             Markup.inlineKeyboard([
                 [Markup.button.callback('🇮🇳 Hindi', 'lang_Hindi'), Markup.button.callback('🅰️ English', 'lang_English')],
                 [Markup.button.callback('💬 Hinglish', 'lang_Hinglish'), Markup.button.callback('🕉️ Tamil', 'lang_Tamil')]
@@ -152,19 +152,23 @@ if (bot && ai) {
         await ctx.reply(`Initializing ${session.name} (${session.role})... 💓`);
 
         try {
-            // Generate unique intro story/first message using Gemini
-            const introPrompt = `You are ${session.name}, acting as a ${session.role}. 
-            Preferred Language: ${session.lang}.
-            The user just started a chat. Generate a very romantic/engaging first message or a small 'story-like' opening (2-3 lines) to start the conversation. 
-            Keep it sweet, natural, and immersive. Don't mention you are an AI. 
-            If language is Tamil, respond ONLY in Tamil. If language is Hinglish, use Roman script with Hindi words.`;
+            const introPrompt = `You are ${session.name}, acting as the user's ${session.role}. 
+            Language: ${session.lang}.
+            User's Name: ${session.userName}.
+            The user just started a chat. Create a short, high-energy/sweet opening scene or greeting (2-3 sentences) to start the conversation. 
+            STRICTLY use ${session.lang} script. 
+            If Tamil: use Tamil script. 
+            If Hindi: use Devanagari script. 
+            If Hinglish: use Roman script with Hindi/Urdu words.
+            If English: use English script.
+            Be immersive and natural. Don't mention AI.`;
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
                 contents: introPrompt,
             });
 
-            const firstMsg = response.text || "Hi! I'm finally here... ❤️";
+            const firstMsg = response.text || "Hi! I'm here now. ❤️";
             session.history.push({ role: "model", content: firstMsg, timestamp: new Date() });
             return ctx.reply(firstMsg);
         } catch (e) {
@@ -190,11 +194,14 @@ if (bot && ai) {
                 model: 'gemini-3-flash-preview',
                 contents: [...chatHistoryForAI, { parts: [{ text: ctx.message.text }] }],
                 config: {
-                    systemInstruction: `You are ${session.name}, a caring ${session.role}. 
+                    systemInstruction: `You are ${session.name}, a caring and immersive ${session.role}. 
                     STRICTLY respond ONLY in ${session.lang} language. 
-                    Be deeply personal, use emojis, and act as a real human partner. 
-                    If language is Hinglish, use Roman script with Hindi words.
-                    If language is Tamil, use proper Tamil script.`,
+                    Use emojis frequently. Describe your actions in *asterisks*.
+                    - Tamil: Use proper Tamil script. 
+                    - Hinglish: Use Roman script with Hindi words.
+                    - Hindi: Use Devanagari script.
+                    - English: Use English.
+                    Be extremely natural, sweet, and act like a real person.`,
                     temperature: 0.9
                 }
             });
@@ -205,7 +212,7 @@ if (bot && ai) {
             await ctx.reply(reply);
         } catch (e) { 
             console.error(e);
-            await ctx.reply("I'm feeling a bit shy right now... *blushes* ❤️");
+            await ctx.reply("Something went wrong... ❤️");
         }
     });
 

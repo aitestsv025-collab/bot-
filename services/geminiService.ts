@@ -17,9 +17,23 @@ export class GeminiBotService {
     if (!this.ai) return;
 
     const emojiRule = " Use frequent and expressive emojis (❤️, ✨, 🥰, 😊).";
-    const langInstruction = config.language === 'Tamil' 
-      ? "STRICTLY speak ONLY in Tamil language." + emojiRule
-      : (config.language === 'Hindi' ? "STRICTLY speak ONLY in Hindi." + emojiRule : "Speak in Hinglish." + emojiRule);
+    let langInstruction = "";
+    
+    switch(config.language) {
+      case 'Tamil':
+        langInstruction = "STRICTLY speak ONLY in Tamil language script." + emojiRule;
+        break;
+      case 'Hindi':
+        langInstruction = "STRICTLY speak ONLY in Hindi Devanagari." + emojiRule;
+        break;
+      case 'Hinglish':
+        langInstruction = "STRICTLY speak ONLY in Hinglish (Roman script)." + emojiRule;
+        break;
+      case 'English':
+      default:
+        langInstruction = "STRICTLY speak ONLY in English." + emojiRule;
+        break;
+    }
 
     const systemInstruction = `
       You are an AI character acting as the user's ${config.name}.
