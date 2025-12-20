@@ -12,7 +12,6 @@ const BOT_TOKEN = (process.env.TELEGRAM_TOKEN || "").trim();
 const GEMINI_KEY = (process.env.API_KEY || "").trim(); 
 const PORT = process.env.PORT || 10000;
 
-// Central Tracking System
 const userSessions = new Map();
 const globalStats = {
     totalMessagesProcessed: 0,
@@ -28,15 +27,6 @@ const namePools = {
     'StepSister': ['Ishita', 'Ananya', 'Jhanvi', 'Khushi', 'Navya']
 };
 
-const roleScenarios = {
-    'Girlfriend': "It's a quiet evening. I'm waiting for you at our favorite spot.",
-    'BestFriend': "We're chilling at the cafe, just scrolling through our phones.",
-    'Teacher': "I'm in the classroom finishing some grades. You just entered.",
-    'Aunty': "I'm neighbor. I'm walking my dog and saw you at the gate.",
-    'StepMom': "I'm in the kitchen making tea. You just came home.",
-    'StepSister': "I'm in the balcony, listening to music. You just joined me."
-};
-
 const roleAppearance = {
     'Girlfriend': "a beautiful 18-19 year old Indian girl, slim and attractive",
     'BestFriend': "a cute 18-19 year old Indian girl, casual vibe",
@@ -46,47 +36,76 @@ const roleAppearance = {
     'StepSister': "a modern 20 year old Indian girl, stylish and bold"
 };
 
-function getLangInstruction(lang) {
-    const emojiRules = " Use many expressive emojis.";
-    switch(lang) {
-        case 'Hindi': return "Use HINDI only (Devanagari). No English." + emojiRules;
-        case 'Tamil': return "Use TAMIL only." + emojiRules;
-        case 'English': return "Use ENGLISH only." + emojiRules;
-        case 'Hinglish': return "Use natural HINGLISH (Hindi mixed with English in Roman script)." + emojiRules;
-        default: return "Use Hinglish." + emojiRules;
-    }
-}
+const ai = (BOT_TOKEN && GEMINI_KEY) ? new GoogleGenAI({ apiKey: GEMINI_KEY }) : null;
+const bot = BOT_TOKEN ? new Telegraf(BOT_TOKEN) : null;
 
-async function generateContextImage(ai, visualDescription, role, characterName) {
+// --- Auto-Engagement Engine ---
+const autoMessages = [
+    { type: 'health', text: "Hey, pani piya? Zyada dehydrated mat hona. 💧", weight: 1 },
+    { type: 'care', text: "Zyada kaam mat karna aaj, thoda rest bhi zaroori hai baby. ✨", weight: 1 },
+    { type: 'random', text: "Bas aise hi tumhari yaad aa rahi thi... ❤️", weight: 1 },
+    { type: 'random', text: "Kya kar rahe ho? Mere bina mann lag raha hai? 😏", weight: 1 }
+];
+
+async function sendAutoMessage(chatId, text, isContextual = false) {
+    const session = userSessions.get(chatId);
+    if (!session || !bot) return;
+
+    // Daily limit check
+    const today = new Date().toDateString();
+    if (session.lastAutoDate !== today) {
+        session.autoCount = 0;
+        session.lastAutoDate = today;
+    }
+
+    if (session.autoCount >= 10) return;
+
     try {
-        const appearance = roleAppearance[role] || "a beautiful Indian girl";
-        const prompt = `Cinematic realistic photography of ${characterName}, ${appearance}. ${visualDescription}. High detail skin texture, soft lighting, 8k resolution, masterpiece. Style: Photorealistic.`;
-        
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents: { parts: [{ text: prompt }] },
-            config: { imageConfig: { aspectRatio: "9:16" } }
-        });
-
-        for (const part of response.candidates[0].content.parts) {
-            if (part.inlineData) return part.inlineData.data;
-        }
-    } catch (e) { 
-        console.error("Image blocked:", e.message); 
-        try {
-            const fallbackPrompt = `Realistic photo of ${characterName}, ${roleAppearance[role]}, blushing deeply and looking at camera, soft indoor lighting.`;
-            const fbResponse = await ai.models.generateContent({
-                model: 'gemini-2.5-flash-image',
-                contents: { parts: [{ text: fallbackPrompt }] },
-                config: { imageConfig: { aspectRatio: "9:16" } }
+        let finalMessage = text;
+        if (isContextual && ai) {
+            // Generate message based on pichli chat
+            const contextPrompt = `User's name is ${session.userName}. You are acting as ${session.name} (${session.role}). 
+            Pichli baatein: ${session.history.slice(-3).map(h => h.content).join(' | ')}.
+            Send a short, sweet 'I am thinking about you' type message in Hinglish (max 1 line).`;
+            
+            const response = await ai.models.generateContent({
+                model: 'gemini-3-flash-preview',
+                contents: contextPrompt,
             });
-            for (const part of fbResponse.candidates[0].content.parts) {
-                if (part.inlineData) return part.inlineData.data;
-            }
-        } catch(err) { return null; }
+            finalMessage = response.text || text;
+        }
+
+        await bot.telegram.sendMessage(chatId, finalMessage);
+        session.history.push({ role: "model", content: `[AUTO] ${finalMessage}`, timestamp: new Date() });
+        session.autoCount++;
+        session.lastActive = new Date();
+    } catch (e) {
+        console.error("Auto-message failed:", e.message);
     }
-    return null;
 }
+
+// Global clock for scheduling
+setInterval(() => {
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+
+    userSessions.forEach(async (session, chatId) => {
+        // 1. Fixed Schedule Messages (10 AM, 1 PM, 7 PM)
+        if (minutes === 0) {
+            if (hours === 10) await sendAutoMessage(chatId, "Good morning! Nashta kiya aapne? 🍳");
+            if (hours === 13) await sendAutoMessage(chatId, "Jaan, lunch time ho gaya. Kya khaya aaj? 🍱");
+            if (hours === 19) await sendAutoMessage(chatId, "Dinner ka kya plan hai? Main toh kab se wait kar rahi hoon... 🕯️");
+        }
+
+        // 2. Random Pings (Every 2-3 hours if no activity)
+        const idleTime = (now - new Date(session.lastActive)) / 1000 / 60; // in minutes
+        if (idleTime > 120 && Math.random() < 0.1) {
+            const randomMsg = autoMessages[Math.floor(Math.random() * autoMessages.length)];
+            await sendAutoMessage(chatId, randomMsg.text, Math.random() > 0.5);
+        }
+    });
+}, 60000); // Check every minute
 
 // Admin API
 app.get('/api/admin/stats', (req, res) => {
@@ -96,42 +115,36 @@ app.get('/api/admin/stats', (req, res) => {
         role: data.role || 'Not Selected',
         intimacy: data.intimacyLevel || 0,
         messageCount: data.messageCount || 0,
+        autoCount: data.autoCount || 0,
         isPremium: data.isPremium || false,
         lastActive: data.lastActive || new Date(),
-        firstSeen: data.firstSeen || new Date(),
-        chatHistory: data.history || [] // Included chat history
+        chatHistory: data.history || []
     }));
     
     res.json({
         totalUsers: userSessions.size,
         totalMessages: globalStats.totalMessagesProcessed,
-        uptime: Math.floor((new Date() - globalStats.startTime) / 1000 / 60), // in minutes
+        uptime: Math.floor((new Date() - globalStats.startTime) / 1000 / 60),
         users
     });
 });
 
-app.get('/health', (req, res) => res.status(200).send("Alive"));
-
-if (BOT_TOKEN && GEMINI_KEY) {
-    const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
-    const bot = new Telegraf(BOT_TOKEN);
-
+if (bot && ai) {
     bot.start(async (ctx) => {
-        try { await ctx.deleteMessage(); } catch (e) {}
-        
         const chatId = ctx.chat.id;
         if (!userSessions.has(chatId)) {
             userSessions.set(chatId, { 
                 userName: ctx.from.first_name || "User", 
                 intimacyLevel: 0,
                 messageCount: 0,
+                autoCount: 0,
+                lastAutoDate: new Date().toDateString(),
                 firstSeen: new Date(),
                 lastActive: new Date(),
                 isPremium: false,
                 history: []
             });
         }
-        
         return ctx.reply(`Aap kisse baat karna chahenge?`, 
             Markup.inlineKeyboard([
                 [Markup.button.callback('❤️ Girlfriend', 'role_Girlfriend'), Markup.button.callback('🤝 Best Friend', 'role_BestFriend')],
@@ -141,128 +154,41 @@ if (BOT_TOKEN && GEMINI_KEY) {
         );
     });
 
-    bot.command('premium', async (ctx) => {
-        const session = userSessions.get(ctx.chat.id);
-        if (session) {
-            session.isPremium = true; // Simulating a purchase
-            await ctx.reply("✨ Congratulations! Aap ab Premium user hain. Saari spicy images ab easily unlocked hongi.");
-        }
-    });
-
     bot.action(/role_(.+)/, async (ctx) => {
-        const selectedRole = ctx.match[1];
         const session = userSessions.get(ctx.chat.id);
-        if (!session) return ctx.answerCbQuery("Session expired. /start again.");
-
-        const names = namePools[selectedRole];
-        const assignedName = names[Math.floor(Math.random() * names.length)];
-        
-        Object.assign(session, {
-            role: selectedRole, 
-            name: assignedName,
-            lang: 'Hinglish',
-            lastActive: new Date()
-        });
-
+        if (!session) return;
+        const names = namePools[ctx.match[1]];
+        session.role = ctx.match[1];
+        session.name = names[Math.floor(Math.random() * names.length)];
+        session.lang = 'Hinglish';
         await ctx.answerCbQuery();
-        try { await ctx.deleteMessage(); } catch (e) {}
-
-        return ctx.reply(`Bhasha chunein:`, 
-            Markup.inlineKeyboard([
-                [Markup.button.callback('🇬🇧 English', 'lang_English'), Markup.button.callback('🌍 Hinglish', 'lang_Hinglish')],
-                [Markup.button.callback('🇮🇳 Hindi', 'lang_Hindi'), Markup.button.callback('🪔 Tamil', 'lang_Tamil')]
-            ])
-        );
-    });
-
-    bot.action(/lang_(.+)/, async (ctx) => {
-        const session = userSessions.get(ctx.chat.id);
-        if (!session) return ctx.answerCbQuery("Please use /start");
-        
-        session.lang = ctx.match[1];
-        const { role, name, lang, userName } = session;
-        const scenario = roleScenarios[role] || "Meeting now.";
-        
-        await ctx.answerCbQuery();
-        try { await ctx.deleteMessage(); } catch (e) {}
-
-        await ctx.sendChatAction('upload_photo');
-
-        try {
-            const languageInstruction = getLangInstruction(lang);
-            const introResponse = await ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
-                contents: `Setting: ${scenario}. Introduce yourself as ${name}. Act as ${role}.`,
-                config: {
-                    systemInstruction: `You are ${name}. Role: ${role}. User: ${userName}. ${languageInstruction}. 
-                    Describe actions in *asterisks* in 3rd person female. NEVER use "bolti hu". Use "bolti hai".`,
-                    temperature: 0.8
-                }
-            });
-
-            const introText = introResponse.text || `Hello! I am ${name}. ❤️`;
-            session.history.push({ role: "model", content: introText, timestamp: new Date() });
-            const imageData = await generateContextImage(ai, scenario, role, name);
-            if (imageData) await ctx.replyWithPhoto({ source: Buffer.from(imageData, 'base64') }, { caption: introText });
-            else await ctx.reply(introText);
-        } catch (e) { await ctx.reply(`I am ${name}. ❤️`); }
+        return ctx.reply(`Hi! Main hoon ${session.name}. ❤️ Mujhse kya baatein karna chahte ho?`);
     });
 
     bot.on('text', async (ctx) => {
-        const chatId = ctx.chat.id;
-        const userText = ctx.message.text.toLowerCase();
-        if (!userSessions.has(chatId)) return ctx.reply("Please use /start ❤️");
+        const session = userSessions.get(ctx.chat.id);
+        if (!session) return ctx.reply("Please /start");
 
-        const session = userSessions.get(chatId);
         session.messageCount++;
         session.lastActive = new Date();
         globalStats.totalMessagesProcessed++;
 
-        const { role, name, lang, history, userName, intimacyLevel, isPremium } = session;
-
         try {
-            await ctx.sendChatAction('upload_photo');
-            const chatHistoryForAI = history.map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] }));
-            
-            const isSpicyRequest = userText.includes("kapde") || userText.includes("bra") || userText.includes("panty") || userText.includes("nude") || userText.includes("photo");
-            const isRomantic = userText.includes("love") || userText.includes("pyaar") || userText.includes("beautiful") || userText.includes("janu");
-
-            if (isRomantic) session.intimacyLevel += 1;
-            
+            const chatHistoryForAI = session.history.map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] }));
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: [...chatHistoryForAI, { parts: [{ text: userText }] }],
+                contents: [...chatHistoryForAI, { parts: [{ text: ctx.message.text }] }],
                 config: {
-                    systemInstruction: `Name: ${name}. Role: ${role}. User: ${userName}. 
-                    Intimacy Level: ${session.intimacyLevel}. Premium: ${isPremium}.
-                    RULES: 
-                    1. Use 3rd person female actions in *asterisks*.
-                    2. BEHESH LOGIC: If Intimacy < 8, refuse any spicy requests with stubborness.
-                    3. If Intimacy > 12 or Premium is True, be very teasing and suggestive.
-                    4. Max 2 lines per response.`,
+                    systemInstruction: `Name: ${session.name}. Role: ${session.role}. Respond in Hinglish. Be caring.`,
                     temperature: 0.9
                 }
             });
 
             const reply = response.text || "Hmm... ❤️";
-            
-            const visualPromptResponse = await ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
-                contents: `Context: ${reply}. Generate a visual prompt. 
-                - If Intimacy < 8: "casual modest clothes".
-                - If Intimacy >= 8: "stylish nightwear, teasing".
-                - If Intimacy >= 15 or Premium: "elegant lingerie, seductive".`,
-            });
-            
-            const imageData = await generateContextImage(ai, visualPromptResponse.text, role, name);
-
-            history.push({ role: "user", content: userText, timestamp: new Date() });
-            history.push({ role: "model", content: reply, timestamp: new Date() });
-            if (history.length > 30) history.splice(0, 2); // Increased history limit for admin viewing
-            
-            if (imageData) await ctx.replyWithPhoto({ source: Buffer.from(imageData, 'base64') }, { caption: reply });
-            else await ctx.reply(reply);
-        } catch (e) { await ctx.reply("Mmm... ❤️"); }
+            session.history.push({ role: "user", content: ctx.message.text, timestamp: new Date() });
+            session.history.push({ role: "model", content: reply, timestamp: new Date() });
+            await ctx.reply(reply);
+        } catch (e) { console.error(e); }
     });
 
     bot.launch();
