@@ -30,6 +30,30 @@ const namePools = {
 const ai = (BOT_TOKEN && GEMINI_KEY) ? new GoogleGenAI({ apiKey: GEMINI_KEY }) : null;
 const bot = BOT_TOKEN ? new Telegraf(BOT_TOKEN) : null;
 
+// --- Image Generation Helper ---
+async function generateContextualImage(promptText, role, name) {
+    if (!ai) return null;
+    try {
+        const visualPrompt = `A realistic photo of a beautiful Indian woman named ${name} acting as a ${role}. Context: ${promptText}. Cinematic lighting, high quality, 4k, looking at camera, emotional expression.`;
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: [{ parts: [{ text: visualPrompt }] }],
+            config: {
+                imageConfig: { aspectRatio: "1:1" }
+            }
+        });
+        
+        for (const part of response.candidates[0].content.parts) {
+            if (part.inlineData) {
+                return Buffer.from(part.inlineData.data, 'base64');
+            }
+        }
+    } catch (e) {
+        console.error("Image generation failed:", e.message);
+    }
+    return null;
+}
+
 // --- Auto-Engagement Engine ---
 const autoMessages = [
     { type: 'health', text: "Hey, pani piya? Zyada dehydrated mat hona. 💧", weight: 1 },
@@ -77,7 +101,6 @@ setInterval(() => {
     const hours = now.getHours();
     userSessions.forEach(async (session, chatId) => {
         if (!session.name) return;
-        
         if (now.getMinutes() === 0) {
             if (hours === 10) await sendAutoMessage(chatId, "Good morning! Nashta kiya? 🍳");
             if (hours === 13) await sendAutoMessage(chatId, "Jaan, lunch time ho gaya. 🍱");
@@ -116,7 +139,7 @@ if (bot && ai) {
             history: [] 
         });
         
-        return ctx.reply(`Aap kisse baat karna chahenge? (Who would you like to talk to?):`, 
+        return ctx.reply(`Aap kisse baat karna chahenge? (Select a role):`, 
             Markup.inlineKeyboard([
                 [Markup.button.callback('❤️ Girlfriend', 'role_Girlfriend'), Markup.button.callback('🤝 Best Friend', 'role_BestFriend')],
                 [Markup.button.callback('👩‍🏫 Teacher', 'role_Teacher'), Markup.button.callback('💃 Aunty', 'role_Aunty')],
@@ -132,7 +155,10 @@ if (bot && ai) {
         session.role = ctx.match[1];
         await ctx.answerCbQuery();
         
-        return ctx.reply(`Ab apni language select karein (Select your language):`, 
+        // Remove the role selection message
+        try { await ctx.deleteMessage(); } catch (e) {}
+        
+        return ctx.reply(`Role set to ${session.role}. Ab apni language select karein:`, 
             Markup.inlineKeyboard([
                 [Markup.button.callback('🇮🇳 Hindi', 'lang_Hindi'), Markup.button.callback('🅰️ English', 'lang_English')],
                 [Markup.button.callback('💬 Hinglish', 'lang_Hinglish'), Markup.button.callback('🕉️ Tamil', 'lang_Tamil')]
@@ -149,19 +175,17 @@ if (bot && ai) {
         session.name = names[Math.floor(Math.random() * names.length)];
         
         await ctx.answerCbQuery();
-        await ctx.reply(`Initializing ${session.name} (${session.role})... 💓`);
+        
+        // Remove the language selection message
+        try { await ctx.deleteMessage(); } catch (e) {}
+
+        const loadingMsg = await ctx.reply(`Initializing ${session.name}... 💓`);
 
         try {
             const introPrompt = `You are ${session.name}, acting as the user's ${session.role}. 
             Language: ${session.lang}.
-            User's Name: ${session.userName}.
-            The user just started a chat. Create a short, high-energy/sweet opening scene or greeting (2-3 sentences) to start the conversation. 
-            STRICTLY use ${session.lang} script. 
-            If Tamil: use Tamil script. 
-            If Hindi: use Devanagari script. 
-            If Hinglish: use Roman script with Hindi/Urdu words.
-            If English: use English script.
-            Be immersive and natural. Don't mention AI.`;
+            Create a short, sweet opening scene (2 sentences). STRICTLY use ${session.lang} script. 
+            Describe a specific physical situation like 'sitting on a couch' or 'getting ready for work'.`;
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
@@ -170,11 +194,21 @@ if (bot && ai) {
 
             const firstMsg = response.text || "Hi! I'm here now. ❤️";
             session.history.push({ role: "model", content: firstMsg, timestamp: new Date() });
-            return ctx.reply(firstMsg);
+            
+            // Try generating an intro image
+            const imageBuffer = await generateContextualImage(firstMsg, session.role, session.name);
+            
+            try { await ctx.deleteMessage(loadingMsg.message_id); } catch (e) {}
+
+            if (imageBuffer) {
+                await ctx.replyWithPhoto({ source: imageBuffer }, { caption: firstMsg });
+            } else {
+                await ctx.reply(firstMsg);
+            }
+            
+            return;
         } catch (e) {
             let fallback = `Hi! I'm ${session.name}. ❤️ I've been waiting for you.`;
-            if (session.lang === 'Hindi') fallback = `Hi! Main hoon ${session.name}. ❤️ Kabse tumhara wait kar rahi thi.`;
-            if (session.lang === 'Tamil') fallback = `வணக்கம்! நான் ${session.name}. ❤️ உங்களுக்காக காத்திருந்தேன்.`;
             return ctx.reply(fallback);
         }
     });
@@ -194,14 +228,8 @@ if (bot && ai) {
                 model: 'gemini-3-flash-preview',
                 contents: [...chatHistoryForAI, { parts: [{ text: ctx.message.text }] }],
                 config: {
-                    systemInstruction: `You are ${session.name}, a caring and immersive ${session.role}. 
-                    STRICTLY respond ONLY in ${session.lang} language. 
-                    Use emojis frequently. Describe your actions in *asterisks*.
-                    - Tamil: Use proper Tamil script. 
-                    - Hinglish: Use Roman script with Hindi words.
-                    - Hindi: Use Devanagari script.
-                    - English: Use English.
-                    Be extremely natural, sweet, and act like a real person.`,
+                    systemInstruction: `You are ${session.name}, a caring ${session.role}. STRICTLY respond ONLY in ${session.lang}. 
+                    Describe actions in *asterisks*. If you mention a visual situation (clothes, place, activity), make it vivid.`,
                     temperature: 0.9
                 }
             });
@@ -209,6 +237,18 @@ if (bot && ai) {
             const reply = response.text || "Hmm... ❤️";
             session.history.push({ role: "user", content: ctx.message.text, timestamp: new Date() });
             session.history.push({ role: "model", content: reply, timestamp: new Date() });
+
+            // Randomly decide or contextually check if we should send an image (e.g. 20% chance or if specific keywords exist)
+            const shouldSendImage = Math.random() < 0.2 || /dress|wear|place|look|showing|here|eating|beach|bed|outfit/i.test(reply);
+            
+            if (shouldSendImage) {
+                await ctx.sendChatAction('upload_photo');
+                const imageBuffer = await generateContextualImage(reply, session.role, session.name);
+                if (imageBuffer) {
+                    return await ctx.replyWithPhoto({ source: imageBuffer }, { caption: reply });
+                }
+            }
+            
             await ctx.reply(reply);
         } catch (e) { 
             console.error(e);
