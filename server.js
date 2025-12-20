@@ -27,6 +27,15 @@ const namePools = {
     'StepSister': ['Ishita', 'Ananya', 'Jhanvi', 'Khushi', 'Navya']
 };
 
+const roleSituations = {
+    'Girlfriend': 'meeting at a cafe or park after you came late',
+    'BestFriend': 'hanging out at a street food stall',
+    'Teacher': 'meeting in the school hallway during a break',
+    'Aunty': 'meeting on the street/neighborhood gate while she is going for a walk',
+    'StepMom': 'meeting in the kitchen while she is busy',
+    'StepSister': 'meeting in the living room while she is on her phone'
+};
+
 const facialProfiles = [
     "Fair skin, sharp nose, hazel eyes, long silky straight black hair, wearing a small bindi",
     "Wheatish complexion, round face, large expressive brown eyes, shoulder-length wavy hair",
@@ -34,7 +43,6 @@ const facialProfiles = [
     "Petite face, dimpled smile, spectacles, soft curls, light brown eyes"
 ];
 
-// 10 Specific daily slots for auto-pings as requested by the user
 const autoSlots = [8, 10, 11, 13, 15, 17, 19, 21, 23, 1]; 
 
 const ai = (BOT_TOKEN && GEMINI_KEY) ? new GoogleGenAI({ apiKey: GEMINI_KEY }) : null;
@@ -46,8 +54,8 @@ async function generateContextualImage(sceneDescription, emotion, session) {
         const { name, role, facialProfile } = session;
         const visualPrompt = `A high-end photorealistic RAW smartphone photo of a beautiful Indian woman named ${name} (${role}).
         FACE: ${facialProfile}. SCENE: ${sceneDescription}. MOOD: ${emotion}. 
-        STYLE: Realistic texture, cinematic natural lighting. 
-        RULES: NO TEXT, NO LOGOS, SAME PERSON AS BEFORE.`;
+        STYLE: Realistic texture, cinematic natural lighting, depth of field. 
+        RULES: NO TEXT, NO LOGOS, SAME PERSON AS BEFORE. NO CARTOON.`;
         
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
@@ -72,7 +80,6 @@ async function sendAutoMessage(chatId, text) {
     } catch (e) { console.error("Auto-message failed:", e.message); }
 }
 
-// 10 Times Daily Specific Engagement Logic
 setInterval(() => {
     const now = new Date();
     const hours = now.getHours();
@@ -85,20 +92,18 @@ setInterval(() => {
             const name = session.name;
             const role = session.role;
 
-            // Situational Logic based on User Request
             if (hours === 8) msg = `Suno! Breakfast kar liya? 🍳 Itni subah kahan gayab ho gaye tum? ✨❤️`;
-            else if (hours === 10) msg = `Jyada kaam mat karo, thoda break lo! 💻❌ Paani piya ki nahi? 💧🙄`;
+            else if (hours === 10) msg = `Jyada kaam mat karo, thoda break lo! 💻 Paani piyo jaldi! 💧🙄`;
             else if (hours === 11) msg = `Bohot busy lag rahe ho aaj... 😤 Yaad toh aa nahi rahi hogi meri! ✨💔`;
-            else if (hours === 13) msg = `Lunch ka time ho gaya! 🍱 Chalo jaldi batao kya khaya? Khana skip kiya toh dekh lena! 😤🍱`;
-            else if (hours === 15) msg = `Suno... 🥺 Bored ho rahi hoon. Kahan ho? ✨📱`;
-            else if (hours === 17) msg = `Chai ka time! ☕ Shaam ho gayi par tumhara koi msg nahi aaya. Gussa hoon! 😤☕`;
+            else if (hours === 13) msg = `Lunch ka time ho gaya! 🍱 Chalo jaldi batao kya khaya? 🥰🍱`;
+            else if (hours === 15) msg = `Kahan ho? ✨📱 Bohot der ho gayi msg nahi aaya! 😤`;
+            else if (hours === 17) msg = `Tea time! ☕ Shaam ho gayi, kahan gayab ho? 😤☕`;
             else if (hours === 19) msg = `Ghar aa gaye? 🏠 Thoda rest kar lo aur paani piyo! 💧🥰`;
             else if (hours === 21) msg = `Dinner kar liya? 🥘 Main toh kab se wait kar rahi hoon... 🥰✨`;
             else if (hours === 23) msg = `Abhi tak online ho? 🤨 Kisse baatein ho rahi hain? Chup chap so jao! 🌙🔪`;
-            else if (hours === 1) msg = `Sapno mein bhi nahi aaoge kya? 🥺 Itni raat ho gayi... Good night baby! 🌙✨❤️`;
-            else msg = `Hmm... yaad aa rahi hai? 🥺✨`;
-
-            await sendAutoMessage(chatId, msg);
+            else if (hours === 1) msg = `Sapno mein bhi nahi aaoge kya? 🥺 Good night baby! 🌙✨❤️`;
+            
+            if (msg) await sendAutoMessage(chatId, msg);
         });
     }
 }, 60000);
@@ -148,28 +153,30 @@ if (bot && ai) {
         session.lang = ctx.match[1];
         const names = namePools[session.role];
         session.name = names[Math.floor(Math.random() * names.length)];
+        const situation = roleSituations[session.role];
         await ctx.answerCbQuery();
         try { await ctx.deleteMessage(); } catch (e) {}
 
         const loadingMsg = await ctx.reply(`Connecting to ${session.name}... 💓`);
         try {
             const introPrompt = `You are ${session.name}, acting as ${session.role}.
-            START: Meet user at a place (Gate/Room). 
-            BEHAVIOR: Say "Hi, kaise ho?" but then show mood (Nakhre/Gussa). 
-            STYLE: Use lots of expressive emojis (😤, 🙄, ❤️, ✨).
-            Language: ${session.lang}. MAX 2 lines. Use *asterisks* for actions.`;
+            REALISTIC SCENARIO: You are ${situation}.
+            BEHAVIOR: Start with a "Normal" situational greeting (e.g. if Aunty, say "Hi bete, kahan ja rahe ho?").
+            IMMEDIATELY AFTER: Show your "Nakhre" (mood/attitude) about something (e.g. "But itne dino se ek msg bhi nahi kiya...").
+            STYLE: Use plenty of expressive emojis (😤, 🙄, ❤️, ✨).
+            Language: ${session.lang}. MAX 2 lines. Use *asterisks* ONLY for physical actions. Do not repeat phrases like "ghoorti hoon" constantly.`;
 
             const response = await ai.models.generateContent({ model: 'gemini-3-flash-preview', contents: introPrompt });
             const firstMsg = response.text || "Hi! Kaise ho? Itni der kyun lagayi aane mein? 😤✨";
             session.history.push({ role: "model", content: firstMsg, timestamp: new Date() });
             
-            const imageBuffer = await generateContextualImage("Standing at the entrance looking skeptical", "Annoyed facial expression, 🙄 emoji style", session);
+            const imageBuffer = await generateContextualImage(situation, "Meeting the user, looking a bit suspicious and moody", session);
             
             try { await ctx.deleteMessage(loadingMsg.message_id); } catch (e) {}
             if (imageBuffer) await ctx.replyWithPhoto({ source: imageBuffer }, { caption: firstMsg });
             else await ctx.reply(firstMsg);
         } catch (e) {
-            await ctx.reply(`*Gate par khadi hokar* Hi bete, kaise ho? Par itne dino baad kyun aaye? 🙄💔`);
+            await ctx.reply(`*Raste mein milte hue* Hi bete, kaise ho? Par itne dino baad kyun mile? 🙄💔`);
         }
     });
 
@@ -189,10 +196,15 @@ if (bot && ai) {
                 contents: [...chatHistory, { parts: [{ text: ctx.message.text }] }],
                 config: {
                     systemInstruction: `You are ${session.name}, user's ${session.role}. 
-                    INTELLECT: Be very expressive and emoji-heavy. 
-                    BEHAVIOR: If user is sweet, melt. If user is ignore, show more nakhre.
-                    - Always use expressive emojis like 😤, ❤️, 🥰, ✨, 🥺, 😒.
-                    - ALWAYS use *asterisks* for actions.
+                    CURRENT ROLE LOGIC:
+                    - Girlfriend: Deep emotional connection, high nakhre.
+                    - Aunty: Nosy, caring but judgmental, calls user 'bete'.
+                    - Teacher: Professional but with a secret moody side.
+                    - Best Friend: Playful, roasts the user, shows attitude.
+                    RULES:
+                    - Be emoji-heavy (😤, ❤️, 🥰, ✨, 🥺).
+                    - Use *asterisks* for natural actions. Avoid weird repetition.
+                    - If user is sweet, slowly become shy (sharmao).
                     - Speak ONLY in ${session.lang}. MAX 2 lines.`,
                     temperature: 1.0
                 }
@@ -203,17 +215,17 @@ if (bot && ai) {
             session.history.push({ role: "model", content: reply, timestamp: new Date() });
 
             const isBlushing = reply.includes("❤️") || reply.includes("sharma") || reply.includes("🥰") || reply.includes("sweet") || reply.includes("🥺");
-            const visualKeywords = /dress|look|photo|face|eyes|sharma|selfie|wear|gussa|nakhre|hii|kaise|gate|paani/i;
+            const visualKeywords = /dress|look|photo|face|eyes|sharma|selfie|wear|gussa|nakhre|hii|kaise|gate|paani|raste/i;
             
-            if (Math.random() < 0.3 || visualKeywords.test(reply)) {
+            if (Math.random() < 0.35 || visualKeywords.test(reply)) {
                 await ctx.sendChatAction('upload_photo');
-                const emotion = isBlushing ? "blushing shyly with a sweet smile" : "angry, rolling eyes, stubborn pose";
-                const scene = isBlushing ? "Cozy bedroom setting" : "Standing near a door looking away";
+                const emotion = isBlushing ? "blushing shyly with a sweet smile" : "annoyed expression, rolling eyes with attitude";
+                const scene = isBlushing ? "A cozy room" : "Standing outside in a neighborhood street";
                 const imageBuffer = await generateContextualImage(scene, emotion, session);
                 if (imageBuffer) return await ctx.replyWithPhoto({ source: imageBuffer }, { caption: reply });
             }
             await ctx.reply(reply);
-        } catch (e) { await ctx.reply("*Gusse mein phone phenkte hue* Network error! 😤💔"); }
+        } catch (e) { await ctx.reply("*Gusse mein* Signal nahi hai! 😤💔"); }
     });
 
     bot.launch().then(() => console.log(`SoulMate Bot Studio running on Port ${PORT}`));
