@@ -27,7 +27,6 @@ const namePools = {
     'StepSister': ['Ishita', 'Ananya', 'Jhanvi', 'Khushi', 'Navya']
 };
 
-// Facial consistency templates to ensure the same person appears throughout a chat session
 const facialProfiles = [
     "Fair skin, sharp nose, hazel eyes, long silky straight black hair, wearing a small bindi",
     "Wheatish complexion, round face, large expressive brown eyes, shoulder-length wavy hair",
@@ -42,14 +41,13 @@ async function generateContextualImage(sceneDescription, emotion, session) {
     if (!ai) return null;
     try {
         const { name, role, facialProfile } = session;
-        // Prompt construction for high consistency and situational accuracy
         const visualPrompt = `A high-end photorealistic RAW smartphone photo of an Indian woman named ${name} (${role}).
         FACE FEATURES: ${facialProfile}.
         SCENE: ${sceneDescription}.
         EMOTION: ${emotion}.
         STYLE: Realistic texture, cinematic natural lighting, depth of field, 8k resolution.
         STRICT RULES: 
-        1. NO TEXT, NO LOGOS, NO WATERMARKS, NO SUBTITLES IN THE IMAGE.
+        1. NO TEXT, NO LOGOS, NO WATERMARKS IN THE IMAGE.
         2. NO CARTOON, NO ANIME, NO CGI.
         3. MUST BE THE EXACT SAME PERSON IN EVERY PHOTO.`;
         
@@ -72,7 +70,6 @@ async function generateContextualImage(sceneDescription, emotion, session) {
     return null;
 }
 
-// Stats API
 app.get('/api/admin/stats', (req, res) => {
     const users = Array.from(userSessions.entries()).map(([id, data]) => ({
         id, userName: data.userName, role: data.role || 'Selecting...',
@@ -123,21 +120,20 @@ if (bot && ai) {
 
         const loadingMsg = await ctx.reply(`Setting the scene for ${session.name}... 💓`);
         try {
-            // Intro prompt logic: Normal start with underlying attitude/mood
             const introPrompt = `You are ${session.name}, user's ${session.role}. 
-            SITUATION: You are starting a conversation in a real-life setting (e.g., at the gate, in a room, meeting after a while).
-            BEHAVIOR: Start with a "Normal" greeting (e.g., "Hi, kaise ho?"), but IMMEDIATELY show a bit of 'Gussa' (anger) or 'Nakhre' (mood) about something (e.g., why didn't you call? why are you here now?).
+            SITUATION: You are meeting the user in a normal setting (e.g., Aunty at the gate, Teacher in the hallway, Girlfriend at home).
+            BEHAVIOR: Start with a "Normal" friendly greeting like "Hi, kaise ho?" or "Hi bete, kya haal hai?".
+            BUT IMMEDIATELY transition to 'Nakhre' or 'Gussa' (e.g., "But itne dino se kahan gayab the?").
             RULES: 
             1. Respond in ${session.lang} script.
-            2. MAX 2 lines. Use emojis.
-            3. Use *asterisks* to describe the situation (e.g., *Gate par khadi hokar tumse puchte hue*).`;
+            2. Use *asterisks* for the scene (e.g., *Gate par khadi hokar puchte hue*).
+            3. MAX 2 lines.`;
 
             const response = await ai.models.generateContent({ model: 'gemini-3-flash-preview', contents: introPrompt });
             const firstMsg = response.text || "Hi, kaise ho? Par itni der kyun kardi? 😤";
             session.history.push({ role: "model", content: firstMsg, timestamp: new Date() });
             
-            // Image for the intro
-            const imageBuffer = await generateContextualImage("Standing at the gate / door in a realistic Indian neighborhood", "Looking skeptical and slightly annoyed", session);
+            const imageBuffer = await generateContextualImage("Standing at the entrance of a house or gate", "Smiling normally but with suspicious eyes", session);
             
             try { await ctx.deleteMessage(loadingMsg.message_id); } catch (e) {}
             if (imageBuffer) await ctx.replyWithPhoto({ source: imageBuffer }, { caption: firstMsg });
@@ -162,17 +158,14 @@ if (bot && ai) {
                 model: 'gemini-3-flash-preview',
                 contents: [...chatHistory, { parts: [{ text: ctx.message.text }] }],
                 config: {
-                    systemInstruction: `You are ${session.name}, acting as the user's ${session.role}.
-                    INTELLECT: Understand exactly how the user is talking. 
-                    PERSONALITY ARC: 
-                    - Stage 1 (Initial): Start "Normal" but stay "Gussa" (Angry) or show "Nakhre" (Attitude). Be hard to please. Give short, moody answers.
-                    - Stage 2 (Transition): Only if the user is patient, respectful, and sweet, slowly "melt".
-                    - Stage 3 (Close): Start blushing (*sharmate hue*) and become caring.
+                    systemInstruction: `You are ${session.name}, user's ${session.role}.
+                    INTELLECT: If the user is being nice, stay stubborn (Nakhre) for at least 5 turns. If user is rude, be very angry.
+                    PERSONALITY ARC:
+                    - Normal Start -> Moody/Angry -> Stubborn -> Slowly Melting -> Shyness.
                     MANDATORY: 
-                    1. Use *asterisks* for every action (e.g., *muh ferte hue*, *nakhre dikha rahi hoon*).
-                    2. MAX 2-3 lines. No long paragraphs.
-                    3. Speak ONLY in ${session.lang}.
-                    4. Keep character consistent.`,
+                    1. Use *asterisks* for every action (e.g., *muh ferte hue*).
+                    2. MAX 2 lines. Speak ONLY in ${session.lang}.
+                    3. Keep face and vibe consistent with previous messages.`,
                     temperature: 0.9
                 }
             });
@@ -181,26 +174,35 @@ if (bot && ai) {
             session.history.push({ role: "user", content: ctx.message.text, timestamp: new Date() });
             session.history.push({ role: "model", content: reply, timestamp: new Date() });
 
-            // Detect emotion from text to generate image
             const isHappy = reply.includes("❤️") || reply.includes("sharma") || reply.includes("🥰") || reply.includes("sweet");
-            const visualKeywords = /dress|look|photo|face|eyes|sharma|selfie|wear|gussa|nakhre|hii|kaise/i;
+            const visualKeywords = /dress|look|photo|face|eyes|sharma|selfie|wear|gussa|nakhre|hii|kaise|gate/i;
             
             if (Math.random() < 0.35 || visualKeywords.test(reply)) {
                 await ctx.sendChatAction('upload_photo');
-                const emotion = isHappy ? "blushing, shy smile, sparkling eyes" : "angry, annoyed expression, crossing arms, looking away";
-                const scene = isHappy ? "Cozy indoor setting" : "Standing in a doorway or park";
+                const emotion = isHappy ? "blushing, shy smile" : "annoyed expression, looking away with attitude";
+                const scene = isHappy ? "Cozy living room" : "Standing near a door or window";
                 const imageBuffer = await generateContextualImage(scene, emotion, session);
                 if (imageBuffer) return await ctx.replyWithPhoto({ source: imageBuffer }, { caption: reply });
             }
             await ctx.reply(reply);
         } catch (e) { 
-            await ctx.reply("*Chiddte hue* Network theek nahi hai mera! 😤");
+            await ctx.reply("*Chiddte hue* Network error! 😤");
         }
     });
 
-    bot.launch();
+    // Graceful Shutdown to prevent 409 Conflict error on Render/Heroku
+    bot.launch().then(() => console.log(`SoulMate Bot Studio running on Port ${PORT}`));
+
+    process.once('SIGINT', () => {
+        bot.stop('SIGINT');
+        process.exit(0);
+    });
+    process.once('SIGTERM', () => {
+        bot.stop('SIGTERM');
+        process.exit(0);
+    });
 }
 
 app.use(express.static(path.join(__dirname, 'dist')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'dist', 'index.html')));
-app.listen(PORT, () => console.log(`SoulMate Bot Studio running on Port ${PORT}`));
+app.listen(PORT);
