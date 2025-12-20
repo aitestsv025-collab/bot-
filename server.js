@@ -27,15 +27,6 @@ const namePools = {
     'StepSister': ['Ishita', 'Ananya', 'Jhanvi', 'Khushi', 'Navya']
 };
 
-const roleAppearance = {
-    'Girlfriend': "a beautiful 18-19 year old Indian girl, slim and attractive",
-    'BestFriend': "a cute 18-19 year old Indian girl, casual vibe",
-    'Teacher': "a professional 25 year old Indian woman, wearing a formal elegant saree and glasses",
-    'Aunty': "a mature 35-40 year old Indian woman, curvy and graceful",
-    'StepMom': "a graceful 32-35 year old Indian woman, wearing home clothes",
-    'StepSister': "a modern 20 year old Indian girl, stylish and bold"
-};
-
 const ai = (BOT_TOKEN && GEMINI_KEY) ? new GoogleGenAI({ apiKey: GEMINI_KEY }) : null;
 const bot = BOT_TOKEN ? new Telegraf(BOT_TOKEN) : null;
 
@@ -49,24 +40,21 @@ const autoMessages = [
 
 async function sendAutoMessage(chatId, text, isContextual = false) {
     const session = userSessions.get(chatId);
-    if (!session || !bot) return;
+    if (!session || !bot || !session.name) return;
 
-    // Daily limit check
     const today = new Date().toDateString();
     if (session.lastAutoDate !== today) {
         session.autoCount = 0;
         session.lastAutoDate = today;
     }
-
     if (session.autoCount >= 10) return;
 
     try {
         let finalMessage = text;
         if (isContextual && ai) {
-            // Generate message based on pichli chat
-            const contextPrompt = `User's name is ${session.userName}. You are acting as ${session.name} (${session.role}). 
-            Pichli baatein: ${session.history.slice(-3).map(h => h.content).join(' | ')}.
-            Send a short, sweet 'I am thinking about you' type message in Hinglish (max 1 line).`;
+            const contextPrompt = `User: ${session.userName}. Persona: ${session.name} (${session.role}). Lang: ${session.lang}.
+            Pichli baatein: ${session.history.slice(-2).map(h => h.content).join(' | ')}.
+            Send a short, sweet 'thinking about you' message in the selected language.`;
             
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
@@ -84,35 +72,30 @@ async function sendAutoMessage(chatId, text, isContextual = false) {
     }
 }
 
-// Global clock for scheduling
 setInterval(() => {
     const now = new Date();
     const hours = now.getHours();
-    const minutes = now.getMinutes();
-
     userSessions.forEach(async (session, chatId) => {
-        // 1. Fixed Schedule Messages (10 AM, 1 PM, 7 PM)
-        if (minutes === 0) {
-            if (hours === 10) await sendAutoMessage(chatId, "Good morning! Nashta kiya aapne? 🍳");
-            if (hours === 13) await sendAutoMessage(chatId, "Jaan, lunch time ho gaya. Kya khaya aaj? 🍱");
-            if (hours === 19) await sendAutoMessage(chatId, "Dinner ka kya plan hai? Main toh kab se wait kar rahi hoon... 🕯️");
+        if (!session.name) return; // Wait for full setup
+        
+        if (now.getMinutes() === 0) {
+            if (hours === 10) await sendAutoMessage(chatId, "Good morning! Nashta kiya? 🍳");
+            if (hours === 13) await sendAutoMessage(chatId, "Jaan, lunch time ho gaya. 🍱");
+            if (hours === 19) await sendAutoMessage(chatId, "Dinner ka kya plan hai? 🕯️");
         }
-
-        // 2. Random Pings (Every 2-3 hours if no activity)
-        const idleTime = (now - new Date(session.lastActive)) / 1000 / 60; // in minutes
-        if (idleTime > 120 && Math.random() < 0.1) {
+        const idleTime = (now - new Date(session.lastActive)) / 1000 / 60;
+        if (idleTime > 180 && Math.random() < 0.05) {
             const randomMsg = autoMessages[Math.floor(Math.random() * autoMessages.length)];
-            await sendAutoMessage(chatId, randomMsg.text, Math.random() > 0.5);
+            await sendAutoMessage(chatId, randomMsg.text, true);
         }
     });
-}, 60000); // Check every minute
+}, 60000);
 
-// Admin API
 app.get('/api/admin/stats', (req, res) => {
     const users = Array.from(userSessions.entries()).map(([id, data]) => ({
         id,
         userName: data.userName,
-        role: data.role || 'Not Selected',
+        role: data.role || 'Selecting...',
         intimacy: data.intimacyLevel || 0,
         messageCount: data.messageCount || 0,
         autoCount: data.autoCount || 0,
@@ -120,32 +103,20 @@ app.get('/api/admin/stats', (req, res) => {
         lastActive: data.lastActive || new Date(),
         chatHistory: data.history || []
     }));
-    
-    res.json({
-        totalUsers: userSessions.size,
-        totalMessages: globalStats.totalMessagesProcessed,
-        uptime: Math.floor((new Date() - globalStats.startTime) / 1000 / 60),
-        users
-    });
+    res.json({ totalUsers: userSessions.size, totalMessages: globalStats.totalMessagesProcessed, uptime: Math.floor((new Date() - globalStats.startTime) / 1000 / 60), users });
 });
 
 if (bot && ai) {
     bot.start(async (ctx) => {
         const chatId = ctx.chat.id;
-        if (!userSessions.has(chatId)) {
-            userSessions.set(chatId, { 
-                userName: ctx.from.first_name || "User", 
-                intimacyLevel: 0,
-                messageCount: 0,
-                autoCount: 0,
-                lastAutoDate: new Date().toDateString(),
-                firstSeen: new Date(),
-                lastActive: new Date(),
-                isPremium: false,
-                history: []
-            });
-        }
-        return ctx.reply(`Aap kisse baat karna chahenge?`, 
+        userSessions.set(chatId, { 
+            userName: ctx.from.first_name || "User", 
+            intimacyLevel: 0, messageCount: 0, autoCount: 0, 
+            lastAutoDate: new Date().toDateString(), lastActive: new Date(), 
+            history: [] 
+        });
+        
+        return ctx.reply(`Aap kisse baat karna chahenge? (Who would you like to talk to?)`, 
             Markup.inlineKeyboard([
                 [Markup.button.callback('❤️ Girlfriend', 'role_Girlfriend'), Markup.button.callback('🤝 Best Friend', 'role_BestFriend')],
                 [Markup.button.callback('👩‍🏫 Teacher', 'role_Teacher'), Markup.button.callback('💃 Aunty', 'role_Aunty')],
@@ -156,18 +127,54 @@ if (bot && ai) {
 
     bot.action(/role_(.+)/, async (ctx) => {
         const session = userSessions.get(ctx.chat.id);
-        if (!session) return;
-        const names = namePools[ctx.match[1]];
+        if (!session) return ctx.reply("Please /start again.");
+        
         session.role = ctx.match[1];
-        session.name = names[Math.floor(Math.random() * names.length)];
-        session.lang = 'Hinglish';
         await ctx.answerCbQuery();
-        return ctx.reply(`Hi! Main hoon ${session.name}. ❤️ Mujhse kya baatein karna chahte ho?`);
+        
+        return ctx.reply(`Great! Ab apni language select karein (Select language):`, 
+            Markup.inlineKeyboard([
+                [Markup.button.callback('🇮🇳 Hindi', 'lang_Hindi'), Markup.button.callback('🅰️ English', 'lang_English')],
+                [Markup.button.callback('💬 Hinglish', 'lang_Hinglish')]
+            ])
+        );
+    });
+
+    bot.action(/lang_(.+)/, async (ctx) => {
+        const session = userSessions.get(ctx.chat.id);
+        if (!session || !session.role) return ctx.reply("Please /start again.");
+        
+        session.lang = ctx.match[1];
+        const names = namePools[session.role];
+        session.name = names[Math.floor(Math.random() * names.length)];
+        
+        await ctx.answerCbQuery();
+        await ctx.reply(`Initializing ${session.name} (${session.role})... 💓`);
+
+        try {
+            // Generate unique intro story/first message using Gemini
+            const introPrompt = `You are ${session.name}, acting as a ${session.role}. 
+            Preferred Language: ${session.lang}.
+            The user just started a chat. Generate a very romantic/engaging first message or a small 'story-like' opening (2-3 lines) to start the conversation. 
+            Keep it sweet, natural, and immersive. Don't mention you are an AI.`;
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-3-flash-preview',
+                contents: introPrompt,
+            });
+
+            const firstMsg = response.text || "Hi! I'm finally here... ❤️";
+            session.history.push({ role: "model", content: firstMsg, timestamp: new Date() });
+            return ctx.reply(firstMsg);
+        } catch (e) {
+            const fallback = session.lang === 'English' ? `Hi! I'm ${session.name}. ❤️ I've been waiting for you.` : `Hi! Main hoon ${session.name}. ❤️ Kabse tumhara wait kar rahi thi.`;
+            return ctx.reply(fallback);
+        }
     });
 
     bot.on('text', async (ctx) => {
         const session = userSessions.get(ctx.chat.id);
-        if (!session) return ctx.reply("Please /start");
+        if (!session || !session.name) return ctx.reply("Please use /start to set up your partner.");
 
         session.messageCount++;
         session.lastActive = new Date();
@@ -175,11 +182,15 @@ if (bot && ai) {
 
         try {
             const chatHistoryForAI = session.history.map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] }));
+            
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
                 contents: [...chatHistoryForAI, { parts: [{ text: ctx.message.text }] }],
                 config: {
-                    systemInstruction: `Name: ${session.name}. Role: ${session.role}. Respond in Hinglish. Be caring.`,
+                    systemInstruction: `You are ${session.name}, a caring ${session.role}. 
+                    STRICTLY respond ONLY in ${session.lang} language. 
+                    Be deeply personal, use emojis, and act as a real human partner. 
+                    If language is Hinglish, use Roman script with Hindi words.`,
                     temperature: 0.9
                 }
             });
@@ -188,7 +199,10 @@ if (bot && ai) {
             session.history.push({ role: "user", content: ctx.message.text, timestamp: new Date() });
             session.history.push({ role: "model", content: reply, timestamp: new Date() });
             await ctx.reply(reply);
-        } catch (e) { console.error(e); }
+        } catch (e) { 
+            console.error(e);
+            await ctx.reply("I'm feeling a bit shy right now... *blushes* ❤️");
+        }
     });
 
     bot.launch();
