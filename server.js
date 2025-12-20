@@ -18,16 +18,21 @@ const globalStats = {
     startTime: new Date()
 };
 
-// --- CUSTOM NSFW IMAGE BANK (Put your GitHub direct links here) ---
+/**
+ * --- GUIDE FOR CUSTOM IMAGES (NSFW/BOLD) ---
+ * 1. Upload your images to a GitHub repo.
+ * 2. Get the RAW link (it looks like: https://raw.githubusercontent.com/user/repo/main/image.jpg).
+ * 3. Add those links to the arrays below for each role.
+ */
 const NSFW_ASSETS = {
     'Girlfriend': [
-        // Example: 'https://raw.githubusercontent.com/username/repo/main/gf_bold1.jpg'
+        // 'https://raw.githubusercontent.com/username/repo/main/gf_hot.jpg',
     ],
     'Aunty': [
-        // Add your spicy aunty images here
+        // 'https://raw.githubusercontent.com/username/repo/main/aunty_bold.jpg',
     ],
     'Teacher': [
-        // Add your seductive teacher images here
+        // 'https://raw.githubusercontent.com/username/repo/main/teacher_sexy.jpg',
     ],
     'StepMom': [],
     'StepSister': []
@@ -188,7 +193,6 @@ if (bot && ai) {
             try { await ctx.deleteMessage(loadingMsg.message_id); } catch (e) {}
             if (imageBuffer) await ctx.replyWithPhoto({ source: imageBuffer }, { caption: firstMsg });
             else {
-                // FALLBACK TO CUSTOM NSFW ASSETS IF GEMINI FAILS
                 const customAssets = NSFW_ASSETS[session.role] || [];
                 if (customAssets.length > 0) {
                     const randomImg = customAssets[Math.floor(Math.random() * customAssets.length)];
@@ -231,27 +235,27 @@ if (bot && ai) {
             session.history.push({ role: "user", content: ctx.message.text, timestamp: new Date() });
             session.history.push({ role: "model", content: reply, timestamp: new Date() });
 
-            const isSeductive = reply.includes("🔥") || reply.includes("🫦") || reply.includes("photo") || reply.includes("hot") || reply.includes("naughty") || reply.includes("bistar");
-            const visualKeywords = /dress|look|photo|face|eyes|selfie|wear|garmi|akeli|room|night|shower|nude|sexy|hot|bistar|sex/i;
-            
-            if (Math.random() < 0.45 || visualKeywords.test(reply) || visualKeywords.test(ctx.message.text)) {
+            const lowerText = ctx.message.text.toLowerCase();
+            const visualKeywords = /dress|look|photo|face|eyes|selfie|wear|garmi|akeli|room|night|shower|nude|sexy|hot|bistar|sex|dick|pussy|breast|show|bhejo/i;
+            const isSeductiveResponse = reply.includes("🔥") || reply.includes("🫦") || reply.includes("hot") || reply.includes("naughty");
+
+            if (Math.random() < 0.5 || visualKeywords.test(lowerText) || visualKeywords.test(reply)) {
                 await ctx.sendChatAction('upload_photo');
                 
-                // PRIORITY: Check for Custom NSFW Assets first if it's a bold request
+                // PRIORITY: Use GitHub Images for Bold/Explicit Keywords
                 const customAssets = NSFW_ASSETS[session.role] || [];
-                if (customAssets.length > 0 && (isSeductive || visualKeywords.test(ctx.message.text))) {
+                if (customAssets.length > 0 && (visualKeywords.test(lowerText) || visualKeywords.test(reply))) {
                     const randomImg = customAssets[Math.floor(Math.random() * customAssets.length)];
                     return await ctx.replyWithPhoto(randomImg, { caption: reply });
                 }
 
-                // SECONDARY: Try Gemini Generation
-                const emotion = isSeductive ? "naughty facial expression, desire" : "playful, messy hair";
-                const scene = isSeductive ? "Private bedroom" : "Cozy home";
+                // SECONDARY: Try Gemini AI Image Generation
+                const emotion = isSeductiveResponse ? "naughty facial expression, desire" : "playful, messy hair";
+                const scene = isSeductiveResponse ? "Private bedroom" : "Cozy home";
                 const imageBuffer = await generateContextualImage(scene, emotion, session);
                 
                 if (imageBuffer) return await ctx.replyWithPhoto({ source: imageBuffer }, { caption: reply });
                 else if (customAssets.length > 0) {
-                     // FINAL FALLBACK: If Gemini filters the image, use the custom bank
                      const randomImg = customAssets[Math.floor(Math.random() * customAssets.length)];
                      return await ctx.replyWithPhoto(randomImg, { caption: reply });
                 }
