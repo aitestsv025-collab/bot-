@@ -161,21 +161,29 @@ if (bot && ai) {
         session.lastActive = new Date();
         globalStats.totalMessagesProcessed++;
 
+        const userMsg = ctx.message.text.toLowerCase();
+        
+        // Simple heuristic for intimacy and triggers
+        if (session.intimacy < 40 && (userMsg.includes("sex") || userMsg.includes("hot") || userMsg.includes("nude") || userMsg.includes("dirty") || userMsg.includes("chu") || userMsg.includes("lund"))) {
+            session.intimacy -= 5;
+        } else if (userMsg.length > 50) {
+            session.intimacy += 2;
+        }
+
         try {
             const chatHistory = session.history.slice(-10).map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] }));
             
             const systemPrompt = `
-            You are ${session.name}, aged ${ageMapping[session.role]}, acting as the user's ${session.role}. 
-            
-            REALISM & DYNAMIC REPLY RULES:
-            1. RESPONSE LENGTH: Do not always give short or long replies. Match the user's energy. If the user asks a deep question, answer with detail. If it's a casual "Hi", be brief.
-            2. BESTIE PERSONA: Strictly use 'Yaar', 'Bro', 'Abe', 'Pagal'. Never 'Baby' unless bond is extremely deep (Intimacy > 80).
-            3. EMOJIS: Always use expressive emojis (😊, ❤️, 🙄, 🔥, 🫦, ✨).
-            4. DYNAMIC VISUALS: Provide a [MOOD: <val> | LOCATION: <val>] tag based on the conversation context.
-            5. LANGUAGE: Only use ${session.lang}.
-            6. FORMAT: START your reply with the metadata bracket:
-               [MOOD: <expression> | LOCATION: <setting>]
-               <Your text response here>
+            You are ${session.name}, an Indian woman aged ${ageMapping[session.role]}, role: ${session.role}. 
+            CURRENT INTIMACY LEVEL: ${session.intimacy}/100.
+
+            STRICT BEHAVIOR RULES:
+            1. MIRROR LENGTH: If the user says 1-5 words, you MUST respond in 1-5 words. Never give long paragraphs unless the user writes a very long message.
+            2. ANGER SYSTEM: If Intimacy < 40 and user is being disrespectful, sexual, or rude: GET ANGRY. Use phrases like "Badtameez", "Aukaat mein raho", "Apni hadd mat bhoolo". Do NOT be friendly if insulted.
+            3. BESTIE: Use 'Yaar', 'Oye', 'Abe', 'Pagal'. Never 'Baby' unless Intimacy > 80.
+            4. EMOJIS: Use them appropriately. If angry, use NO emojis. If happy, use many (😊, ❤️, ✨).
+            5. IMAGE TAG: ALWAYS start with [MOOD: <val> | LOCATION: <val>].
+            6. LANGUAGE: Speak only in ${session.lang}.
             `;
 
             const response = await ai.models.generateContent({
@@ -187,7 +195,7 @@ if (bot && ai) {
             const rawResponse = response.text || "Mmm... 😊";
             
             const metaMatch = rawResponse.match(/\[MOOD: (.*?) \| LOCATION: (.*?)\]/);
-            const emotion = metaMatch ? metaMatch[1] : "smiling";
+            const emotion = metaMatch ? metaMatch[1] : (session.intimacy < 30 ? "annoyed" : "smiling");
             const location = metaMatch ? metaMatch[2] : "living room";
             const reply = rawResponse.replace(/\[MOOD:.*?\]/, "").trim();
 
@@ -205,11 +213,11 @@ if (bot && ai) {
 
         } catch (e) { 
             console.error(e);
-            await ctx.reply("Arre... network issue ho gaya. 😤"); 
+            await ctx.reply("Net problem... 😤"); 
         }
     });
 
-    bot.launch().then(() => console.log(`Dynamic Realistic Engine Online`));
+    bot.launch().then(() => console.log(`Realistic AI Engine (Anger & Mirroring) Online`));
 }
 
 app.use(express.static(path.join(__dirname, 'dist')));
