@@ -44,8 +44,8 @@ const facialProfiles = [
 ];
 
 const clothingPools = {
-    young: ["a simple white crop top and blue denim jeans", "a floral pink summer dress", "a casual yellow oversized t-shirt", "a trendy black tank top"],
-    mature: ["a sophisticated maroon cotton saree", "a black and gold designer salwar suit", "an elegant silk blue saree", "a formal white shirt and black trousers"]
+    young: ["a stylish white crop top and blue denim shorts", "a cute floral pink sun-dress", "a casual yellow oversized hoodie and leggings", "a trendy black tank top and jeans"],
+    mature: ["a sophisticated maroon silk saree with a gold border", "a black designer salwar suit with embroidery", "an elegant chiffon blue saree", "a formal crisp white shirt and dark trousers"]
 };
 
 const ai = (BOT_TOKEN && GEMINI_KEY) ? new GoogleGenAI({ apiKey: GEMINI_KEY }) : null;
@@ -57,14 +57,13 @@ async function generateContextualImage(sceneDescription, emotion, session) {
         const { name, role, facialProfile, fixedClothing } = session;
         const age = ageMapping[role] || 25;
 
-        // The prompt strictly enforces the SAME face and SAME clothing, only changing expression and location.
-        const visualPrompt = `A ultra-realistic high-end RAW smartphone selfie of a ${age}-year-old Indian woman named ${name}.
-        IDENTITY: She is the user's ${role}. 
+        const visualPrompt = `A high-end realistic RAW smartphone selfie of a ${age}-year-old Indian woman named ${name}.
+        IDENTITY: User's ${role}. 
         STRICT FACE CONSISTENCY: ${facialProfile}. 
         STRICT CLOTHING CONSISTENCY: She MUST be wearing ${fixedClothing}.
-        DYNAMIC CONTEXT: Location is ${sceneDescription}. Her facial expression is ${emotion}.
-        TECHNICAL: Realistic skin texture, natural soft lighting, 8k resolution, photorealistic, iPhone 15 Pro quality.
-        RULES: NO TEXT, NO LOGOS, NO CARTOON, NO CLOTHING CHANGES.`;
+        DYNAMIC CONTEXT: Location is ${sceneDescription}. Expression: ${emotion}.
+        TECHNICAL: Realistic skin texture, natural soft lighting, depth of field, high-resolution, iPhone 15 Pro photo style.
+        CRITICAL: No change in her facial structure or outfit. Only background and expression change. NO TEXT, NO LOGOS, NO CARTOON.`;
         
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
@@ -100,9 +99,9 @@ if (bot && ai) {
         });
         return ctx.reply(`Aap kisse baat karna chahenge? ❤️✨`, 
             Markup.inlineKeyboard([
-                [Markup.button.callback('❤️ Girlfriend (18)', 'role_Girlfriend'), Markup.button.callback('🤝 Bestie (18)', 'role_BestFriend')],
-                [Markup.button.callback('👩‍🏫 Teacher (35)', 'role_Teacher'), Markup.button.callback('💃 Spicy Aunty (35)', 'role_Aunty')],
-                [Markup.button.callback('🏠 Step Mom (35)', 'role_StepMom'), Markup.button.callback('👧 Step Sister (18)', 'role_StepSister')]
+                [Markup.button.callback('❤️ Girlfriend', 'role_Girlfriend'), Markup.button.callback('🤝 Bestie', 'role_BestFriend')],
+                [Markup.button.callback('👩‍🏫 Teacher', 'role_Teacher'), Markup.button.callback('💃 Spicy Aunty', 'role_Aunty')],
+                [Markup.button.callback('🏠 Step Mom', 'role_StepMom'), Markup.button.callback('👧 Step Sister', 'role_StepSister')]
             ])
         );
     });
@@ -112,7 +111,6 @@ if (bot && ai) {
         if (!session) return ctx.reply("Please /start again.");
         session.role = ctx.match[1];
         
-        // Fix clothing for the ENTIRE session
         const pool = ageMapping[session.role] <= 20 ? clothingPools.young : clothingPools.mature;
         session.fixedClothing = pool[Math.floor(Math.random() * pool.length)];
         
@@ -134,20 +132,20 @@ if (bot && ai) {
         await ctx.answerCbQuery();
         try { await ctx.deleteMessage(); } catch (e) {}
 
-        const welcomeMsgs = {
-            'Girlfriend': "Hii baby... tum aa gaye? ❤️ Bahut yaad aa rahi thi tumhari.",
-            'BestFriend': "Aur bata yaar! Kya scene hai? Aaj bada free hai tu? 🙄☕",
-            'Teacher': "Namaste. Syllabus toh tumne dekha nahi hoga, chalo thodi padhai karein? 👩‍🏫",
-            'Aunty': "Beta, kitchen mein thoda haath bataoge? Ghar pe akeli boring ho rahi hoon. 😊🥘",
+        const initialGreetings = {
+            'Girlfriend': "Hii baby... tum aa gaye? ❤️ Bahut miss kar rahi thi.",
+            'BestFriend': "Aur bata yaar! Kya scene hai? 🙄☕",
+            'Teacher': "Namaste. Syllabus ke baare mein kuch baat karni thi... 👩‍🏫",
+            'Aunty': "Beta, ghar par bore ho rahi hoon, thodi help karoge? 😊🥘",
             'StepMom': "Aa gaye tum? Chalo haath-muh dho lo, maine tumhara favorite khana banaya hai. 🏠🥘",
-            'StepSister': "Bhaiya! Mera project poora kar doge na? Please... 🥺✨"
+            'StepSister': "Bhaiya! Aap aa gaye? Mujhe aapse kuch poochhna tha... 🥺✨"
         };
 
-        const reply = welcomeMsgs[session.role];
+        const reply = initialGreetings[session.role];
         session.history.push({ role: "model", content: reply, timestamp: new Date() });
         
         await ctx.sendChatAction('upload_photo');
-        const img = await generateContextualImage("the living room", "warm welcoming smile", session);
+        const img = await generateContextualImage("the hallway", "sweet welcoming smile", session);
         if (img) {
             await ctx.replyWithPhoto({ source: img }, { caption: reply });
         } else {
@@ -167,30 +165,31 @@ if (bot && ai) {
             const chatHistory = session.history.slice(-10).map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] }));
             
             const systemPrompt = `
-            You are ${session.name}, aged ${ageMapping[session.role]}, role: ${session.role}. 
+            You are ${session.name}, aged ${ageMapping[session.role]}, acting as the user's ${session.role}. 
             
-            STRICT RULES:
-            1. BESTIE: NEVER call him 'Baby' or 'Jaan'. Use 'Yaar', 'Abe', 'Kamine'.
-            2. MOOD: Based on the chat, determine your MOOD and LOCATION for the photo.
-            3. EMOJIS: Use emojis in EVERY reply.
-            4. FORMAT: Output MUST be in this format:
-               [MOOD: <one word mood> | LOCATION: <one word location>]
-               <Your actual reply text in ${session.lang}>
+            REALISM & DYNAMIC REPLY RULES:
+            1. RESPONSE LENGTH: Do not always give short or long replies. Match the user's energy. If the user asks a deep question, answer with detail. If it's a casual "Hi", be brief.
+            2. BESTIE PERSONA: Strictly use 'Yaar', 'Bro', 'Abe', 'Pagal'. Never 'Baby' unless bond is extremely deep (Intimacy > 80).
+            3. EMOJIS: Always use expressive emojis (😊, ❤️, 🙄, 🔥, 🫦, ✨).
+            4. DYNAMIC VISUALS: Provide a [MOOD: <val> | LOCATION: <val>] tag based on the conversation context.
+            5. LANGUAGE: Only use ${session.lang}.
+            6. FORMAT: START your reply with the metadata bracket:
+               [MOOD: <expression> | LOCATION: <setting>]
+               <Your text response here>
             `;
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
                 contents: [...chatHistory, { parts: [{ text: ctx.message.text }] }],
-                config: { systemInstruction: systemPrompt, temperature: 0.9 }
+                config: { systemInstruction: systemPrompt, temperature: 0.95 }
             });
 
-            const fullText = response.text || "Hmm... 😊";
+            const rawResponse = response.text || "Mmm... 😊";
             
-            // Extract visual metadata from response
-            const moodMatch = fullText.match(/\[MOOD: (.*?) \| LOCATION: (.*?)\]/);
-            const emotion = moodMatch ? moodMatch[1] : "smiling";
-            const location = moodMatch ? moodMatch[2] : "bedroom";
-            const reply = fullText.replace(/\[MOOD:.*?\]/, "").trim();
+            const metaMatch = rawResponse.match(/\[MOOD: (.*?) \| LOCATION: (.*?)\]/);
+            const emotion = metaMatch ? metaMatch[1] : "smiling";
+            const location = metaMatch ? metaMatch[2] : "living room";
+            const reply = rawResponse.replace(/\[MOOD:.*?\]/, "").trim();
 
             session.history.push({ role: "user", content: ctx.message.text, timestamp: new Date() });
             session.history.push({ role: "model", content: reply, timestamp: new Date() });
@@ -206,11 +205,11 @@ if (bot && ai) {
 
         } catch (e) { 
             console.error(e);
-            await ctx.reply("Network problem baby... 😤"); 
+            await ctx.reply("Arre... network issue ho gaya. 😤"); 
         }
     });
 
-    bot.launch().then(() => console.log(`Realistic Consistent Bot Engine Online`));
+    bot.launch().then(() => console.log(`Dynamic Realistic Engine Online`));
 }
 
 app.use(express.static(path.join(__dirname, 'dist')));
