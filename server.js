@@ -18,6 +18,12 @@ const globalStats = {
     startTime: new Date()
 };
 
+// Yahan aap apne GitHub ke image links daal sakte hain
+const specialPhotos = [
+    "https://raw.githubusercontent.com/username/repo/main/image1.jpg",
+    "https://raw.githubusercontent.com/username/repo/main/image2.jpg"
+];
+
 const namePools = {
     'Girlfriend': ['Riya', 'Sana', 'Ishani', 'Myra', 'Tanvi', 'Priya'],
     'BestFriend': ['Sneha', 'Anjali', 'Kritika', 'Diya', 'Tanu'],
@@ -44,8 +50,8 @@ const facialProfiles = [
 ];
 
 const clothingPools = {
-    young: ["a stylish white crop top and blue denim shorts", "a cute floral pink sun-dress", "a casual yellow oversized hoodie and leggings", "a trendy black tank top and jeans"],
-    mature: ["a sophisticated maroon silk saree with a gold border", "a black designer salwar suit with embroidery", "an elegant chiffon blue saree", "a formal crisp white shirt and dark trousers"]
+    young: ["a stylish white crop top and blue denim shorts", "a cute floral pink sun-dress", "a casual yellow oversized hoodie", "a trendy black tank top"],
+    mature: ["a sophisticated maroon silk saree", "a black designer salwar suit", "an elegant chiffon blue saree", "a formal white shirt and trousers"]
 };
 
 const ai = (BOT_TOKEN && GEMINI_KEY) ? new GoogleGenAI({ apiKey: GEMINI_KEY }) : null;
@@ -61,9 +67,9 @@ async function generateContextualImage(sceneDescription, emotion, session) {
         IDENTITY: User's ${role}. 
         STRICT FACE CONSISTENCY: ${facialProfile}. 
         STRICT CLOTHING CONSISTENCY: She MUST be wearing ${fixedClothing}.
-        DYNAMIC CONTEXT: Location is ${sceneDescription}. Expression: ${emotion}.
-        TECHNICAL: Realistic skin texture, natural soft lighting, depth of field, high-resolution, iPhone 15 Pro photo style.
-        CRITICAL: No change in her facial structure or outfit. Only background and expression change. NO TEXT, NO LOGOS, NO CARTOON.`;
+        DYNAMIC CONTEXT: At ${sceneDescription}. Expression: ${emotion}.
+        TECHNICAL: Realistic skin texture, natural soft lighting, depth of field, high-resolution.
+        RULES: No changes in face or outfit. Only background and expression change. NO TEXT.`;
         
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
@@ -77,15 +83,6 @@ async function generateContextualImage(sceneDescription, emotion, session) {
     } catch (e) { console.error("Image Gen Error:", e.message); }
     return null;
 }
-
-app.get('/api/admin/stats', (req, res) => {
-    const users = Array.from(userSessions.entries()).map(([id, data]) => ({
-        id, userName: data.userName, role: data.role || 'Selecting...',
-        messageCount: data.messageCount || 0, intimacy: data.intimacy,
-        lastActive: data.lastActive || new Date(), chatHistory: data.history || []
-    }));
-    res.json({ totalUsers: userSessions.size, totalMessages: globalStats.totalMessagesProcessed, users });
-});
 
 if (bot && ai) {
     bot.start(async (ctx) => {
@@ -110,10 +107,8 @@ if (bot && ai) {
         const session = userSessions.get(ctx.chat.id);
         if (!session) return ctx.reply("Please /start again.");
         session.role = ctx.match[1];
-        
         const pool = ageMapping[session.role] <= 20 ? clothingPools.young : clothingPools.mature;
         session.fixedClothing = pool[Math.floor(Math.random() * pool.length)];
-        
         await ctx.answerCbQuery();
         try { await ctx.deleteMessage(); } catch (e) {}
         return ctx.reply(`Bhasha chuniye... 💬`, 
@@ -131,31 +126,17 @@ if (bot && ai) {
         session.name = namePools[session.role][Math.floor(Math.random() * namePools[session.role].length)];
         await ctx.answerCbQuery();
         try { await ctx.deleteMessage(); } catch (e) {}
-
-        const initialGreetings = {
-            'Girlfriend': "Hii baby... tum aa gaye? ❤️ Bahut miss kar rahi thi.",
-            'BestFriend': "Aur bata yaar! Kya scene hai? 🙄☕",
-            'Teacher': "Namaste. Syllabus ke baare mein kuch baat karni thi... 👩‍🏫",
-            'Aunty': "Beta, ghar par bore ho rahi hoon, thodi help karoge? 😊🥘",
-            'StepMom': "Aa gaye tum? Chalo haath-muh dho lo, maine tumhara favorite khana banaya hai. 🏠🥘",
-            'StepSister': "Bhaiya! Aap aa gaye? Mujhe aapse kuch poochhna tha... 🥺✨"
-        };
-
-        const reply = initialGreetings[session.role];
+        const reply = `Hii... tum aa gaye? Bahut miss kiya maine tumhe. ❤️\nBatao, aaj ka din kaisa raha?`;
         session.history.push({ role: "model", content: reply, timestamp: new Date() });
-        
         await ctx.sendChatAction('upload_photo');
-        const img = await generateContextualImage("the hallway", "sweet welcoming smile", session);
-        if (img) {
-            await ctx.replyWithPhoto({ source: img }, { caption: reply });
-        } else {
-            await ctx.reply(reply);
-        }
+        const img = await generateContextualImage("living room", "sweet smile", session);
+        if (img) await ctx.replyWithPhoto({ source: img }, { caption: reply });
+        else await ctx.reply(reply);
     });
 
     bot.on('text', async (ctx) => {
         const session = userSessions.get(ctx.chat.id);
-        if (!session || !session.name) return ctx.reply("Please /start to begin.");
+        if (!session || !session.name) return ctx.reply("Please /start.");
 
         session.messageCount++;
         session.lastActive = new Date();
@@ -163,10 +144,11 @@ if (bot && ai) {
 
         const userMsg = ctx.message.text.toLowerCase();
         
-        // Simple heuristic for intimacy and triggers
-        if (session.intimacy < 40 && (userMsg.includes("sex") || userMsg.includes("hot") || userMsg.includes("nude") || userMsg.includes("dirty") || userMsg.includes("chu") || userMsg.includes("lund"))) {
-            session.intimacy -= 5;
-        } else if (userMsg.length > 50) {
+        // Dynamic intimacy adjustment
+        const isRude = userMsg.match(/(sex|hot|nude|lund|chut|badtameez|ganda)/);
+        if (isRude && session.intimacy < 45) {
+            session.intimacy -= 10;
+        } else if (userMsg.length > 20) {
             session.intimacy += 2;
         }
 
@@ -174,51 +156,63 @@ if (bot && ai) {
             const chatHistory = session.history.slice(-10).map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] }));
             
             const systemPrompt = `
-            You are ${session.name}, an Indian woman aged ${ageMapping[session.role]}, role: ${session.role}. 
-            CURRENT INTIMACY LEVEL: ${session.intimacy}/100.
-
-            STRICT BEHAVIOR RULES:
-            1. MIRROR LENGTH: If the user says 1-5 words, you MUST respond in 1-5 words. Never give long paragraphs unless the user writes a very long message.
-            2. ANGER SYSTEM: If Intimacy < 40 and user is being disrespectful, sexual, or rude: GET ANGRY. Use phrases like "Badtameez", "Aukaat mein raho", "Apni hadd mat bhoolo". Do NOT be friendly if insulted.
-            3. BESTIE: Use 'Yaar', 'Oye', 'Abe', 'Pagal'. Never 'Baby' unless Intimacy > 80.
-            4. EMOJIS: Use them appropriately. If angry, use NO emojis. If happy, use many (😊, ❤️, ✨).
-            5. IMAGE TAG: ALWAYS start with [MOOD: <val> | LOCATION: <val>].
-            6. LANGUAGE: Speak only in ${session.lang}.
+            You are ${session.name}, role: ${session.role}. 
+            INTIMACY: ${session.intimacy}/100.
+            
+            RULES:
+            1. MINIMUM LENGTH: Your reply MUST be at least 2 lines long. Never give a single sentence.
+            2. ANGER SYSTEM: If Intimacy < 40 and user is being creepy/rude, GET ANGRY. Do not flirt. Be cold and defensive.
+            3. SPECIAL_PHOTO: If Intimacy > 60 and user asks for a photo/nude/spicy pic, include "[SEND_SPECIAL_PHOTO]" in your text.
+            4. VISUALS: Always start with [MOOD: <expression> | LOCATION: <place>].
+            5. LANGUAGE: Use only ${session.lang}.
+            6. PERSONALITY: If Bestie, use 'Abe', 'Yaar'. If Girlfriend, be sweet (unless angry).
             `;
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
                 contents: [...chatHistory, { parts: [{ text: ctx.message.text }] }],
-                config: { systemInstruction: systemPrompt, temperature: 0.95 }
+                config: { systemInstruction: systemPrompt, temperature: 0.9 }
             });
 
-            const rawResponse = response.text || "Mmm... 😊";
+            const rawResponse = response.text || "Main soch rahi hoon... 😊\nBatao aur kya chal raha hai?";
             
             const metaMatch = rawResponse.match(/\[MOOD: (.*?) \| LOCATION: (.*?)\]/);
-            const emotion = metaMatch ? metaMatch[1] : (session.intimacy < 30 ? "annoyed" : "smiling");
-            const location = metaMatch ? metaMatch[2] : "living room";
-            const reply = rawResponse.replace(/\[MOOD:.*?\]/, "").trim();
+            const emotion = metaMatch ? metaMatch[1] : (session.intimacy < 40 ? "angry" : "smiling");
+            const location = metaMatch ? metaMatch[2] : "bedroom";
+            const reply = rawResponse.replace(/\[MOOD:.*?\]/, "").replace("[SEND_SPECIAL_PHOTO]", "").trim();
 
             session.history.push({ role: "user", content: ctx.message.text, timestamp: new Date() });
             session.history.push({ role: "model", content: reply, timestamp: new Date() });
 
             await ctx.sendChatAction('upload_photo');
-            const imgBuffer = await generateContextualImage(location, emotion, session);
-            
-            if (imgBuffer) {
-                await ctx.replyWithPhoto({ source: imgBuffer }, { caption: reply });
+
+            // Logic to send GitHub photo vs Generated photo
+            if (rawResponse.includes("[SEND_SPECIAL_PHOTO]") && specialPhotos.length > 0) {
+                const randomSpecial = specialPhotos[Math.floor(Math.random() * specialPhotos.length)];
+                await ctx.replyWithPhoto(randomSpecial, { caption: reply });
             } else {
-                await ctx.reply(reply);
+                const imgBuffer = await generateContextualImage(location, emotion, session);
+                if (imgBuffer) await ctx.replyWithPhoto({ source: imgBuffer }, { caption: reply });
+                else await ctx.reply(reply);
             }
 
         } catch (e) { 
             console.error(e);
-            await ctx.reply("Net problem... 😤"); 
+            await ctx.reply("Mujhe thoda gussa aa raha hai... network issue hai.\nChalo baad mein baat karte hain."); 
         }
     });
 
-    bot.launch().then(() => console.log(`Realistic AI Engine (Anger & Mirroring) Online`));
+    bot.launch();
 }
+
+app.get('/api/admin/stats', (req, res) => {
+    const users = Array.from(userSessions.entries()).map(([id, data]) => ({
+        id, userName: data.userName, role: data.role || '...',
+        messageCount: data.messageCount, intimacy: data.intimacy,
+        chatHistory: data.history.slice(-20)
+    }));
+    res.json({ totalUsers: userSessions.size, totalMessages: globalStats.totalMessagesProcessed, users });
+});
 
 app.use(express.static(path.join(__dirname, 'dist')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'dist', 'index.html')));
