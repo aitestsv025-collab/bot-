@@ -27,12 +27,26 @@ const namePools = {
     'StepSister': ['Ishita', 'Ananya', 'Jhanvi', 'Khushi', 'Navya']
 };
 
+const ageMapping = {
+    'Girlfriend': 18,
+    'BestFriend': 18,
+    'StepSister': 18,
+    'Teacher': 35,
+    'Aunty': 35,
+    'StepMom': 35
+};
+
 const facialProfiles = [
-    "Extremely fair, bold eyes, long silky straight black hair, small bindi",
-    "Wheatish complexion, sharp nose, expressive brown eyes, shoulder-length wavy hair",
-    "Oval face, high cheekbones, dark eyes, thick jet black hair, intense gaze",
-    "Petite face, dimpled smile, spectacles, soft curls, light brown eyes"
+    "Sharp jawline, deep brown almond-shaped eyes, long silky jet-black hair parted in the middle, small silver nose pin",
+    "Soft round face, big expressive black eyes, thick wavy dark hair, fair skin with a natural glow",
+    "Oval face, high cheekbones, thin lips, intense gaze, straight shoulder-length black hair",
+    "Petite face, dimpled cheeks, soft brownish-black hair, light brown eyes, very fair complexion"
 ];
+
+const clothingPools = {
+    young: ["a simple white crop top and blue denim jeans", "a floral pink summer dress", "a casual yellow oversized t-shirt", "a trendy black tank top"],
+    mature: ["a sophisticated maroon cotton saree", "a black and gold designer salwar suit", "an elegant silk blue saree", "a formal white shirt and black trousers"]
+};
 
 const ai = (BOT_TOKEN && GEMINI_KEY) ? new GoogleGenAI({ apiKey: GEMINI_KEY }) : null;
 const bot = BOT_TOKEN ? new Telegraf(BOT_TOKEN) : null;
@@ -40,19 +54,17 @@ const bot = BOT_TOKEN ? new Telegraf(BOT_TOKEN) : null;
 async function generateContextualImage(sceneDescription, emotion, session) {
     if (!ai) return null;
     try {
-        const { name, role, facialProfile, intimacy } = session;
-        // Clothing evolves with intimacy
-        let clothing = "Casual Kurti and Jeans";
-        if (intimacy > 40) clothing = "Saree with deep neck";
-        if (intimacy > 70) clothing = "Night gown or short dress";
+        const { name, role, facialProfile, fixedClothing } = session;
+        const age = ageMapping[role] || 25;
 
-        const visualPrompt = `A high-end photorealistic RAW smartphone selfie of an Indian woman named ${name} (${role}). 
-        FACE: ${facialProfile}. 
-        CLOTHING: ${clothing}. 
-        SCENE: ${sceneDescription}. 
-        MOOD: ${emotion}. 
-        STYLE: Realistic texture, casual pose, natural room lighting. 
-        RULES: NO TEXT, NO LOGOS, NO CARTOON, PHOTOREALISTIC ONLY.`;
+        // The prompt strictly enforces the SAME face and SAME clothing, only changing expression and location.
+        const visualPrompt = `A ultra-realistic high-end RAW smartphone selfie of a ${age}-year-old Indian woman named ${name}.
+        IDENTITY: She is the user's ${role}. 
+        STRICT FACE CONSISTENCY: ${facialProfile}. 
+        STRICT CLOTHING CONSISTENCY: She MUST be wearing ${fixedClothing}.
+        DYNAMIC CONTEXT: Location is ${sceneDescription}. Her facial expression is ${emotion}.
+        TECHNICAL: Realistic skin texture, natural soft lighting, 8k resolution, photorealistic, iPhone 15 Pro quality.
+        RULES: NO TEXT, NO LOGOS, NO CARTOON, NO CLOTHING CHANGES.`;
         
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
@@ -81,16 +93,16 @@ if (bot && ai) {
         userSessions.set(ctx.chat.id, { 
             userName: ctx.from.first_name || "User", 
             messageCount: 0, 
-            intimacy: 10, // Starting intimacy
+            intimacy: 20, 
             history: [], 
             lastActive: new Date(),
             facialProfile: facialProfiles[Math.floor(Math.random() * facialProfiles.length)]
         });
-        return ctx.reply(`Hi ${ctx.from.first_name}! Main tumhare liye kya banu? ❤️✨`, 
+        return ctx.reply(`Aap kisse baat karna chahenge? ❤️✨`, 
             Markup.inlineKeyboard([
-                [Markup.button.callback('❤️ Girlfriend', 'role_Girlfriend'), Markup.button.callback('🤝 Bestie', 'role_BestFriend')],
-                [Markup.button.callback('👩‍🏫 Teacher', 'role_Teacher'), Markup.button.callback('💃 Spicy Aunty', 'role_Aunty')],
-                [Markup.button.callback('🏠 Step Mom', 'role_StepMom'), Markup.button.callback('👧 Step Sister', 'role_StepSister')]
+                [Markup.button.callback('❤️ Girlfriend (18)', 'role_Girlfriend'), Markup.button.callback('🤝 Bestie (18)', 'role_BestFriend')],
+                [Markup.button.callback('👩‍🏫 Teacher (35)', 'role_Teacher'), Markup.button.callback('💃 Spicy Aunty (35)', 'role_Aunty')],
+                [Markup.button.callback('🏠 Step Mom (35)', 'role_StepMom'), Markup.button.callback('👧 Step Sister (18)', 'role_StepSister')]
             ])
         );
     });
@@ -99,9 +111,14 @@ if (bot && ai) {
         const session = userSessions.get(ctx.chat.id);
         if (!session) return ctx.reply("Please /start again.");
         session.role = ctx.match[1];
+        
+        // Fix clothing for the ENTIRE session
+        const pool = ageMapping[session.role] <= 20 ? clothingPools.young : clothingPools.mature;
+        session.fixedClothing = pool[Math.floor(Math.random() * pool.length)];
+        
         await ctx.answerCbQuery();
         try { await ctx.deleteMessage(); } catch (e) {}
-        return ctx.reply(`Hum kis bhasha mein baat karenge? 💬`, 
+        return ctx.reply(`Bhasha chuniye... 💬`, 
             Markup.inlineKeyboard([
                 [Markup.button.callback('🇮🇳 Hindi', 'lang_Hindi'), Markup.button.callback('🅰️ English', 'lang_English')],
                 [Markup.button.callback('💬 Hinglish', 'lang_Hinglish'), Markup.button.callback('🕉️ Tamil', 'lang_Tamil')]
@@ -113,23 +130,29 @@ if (bot && ai) {
         const session = userSessions.get(ctx.chat.id);
         if (!session) return ctx.reply("Please /start again.");
         session.lang = ctx.match[1];
-        const names = namePools[session.role];
-        session.name = names[Math.floor(Math.random() * names.length)];
+        session.name = namePools[session.role][Math.floor(Math.random() * namePools[session.role].length)];
         await ctx.answerCbQuery();
         try { await ctx.deleteMessage(); } catch (e) {}
 
-        const initialGreeting = {
-            'Girlfriend': "Hi! Tum aa gaye? Kab se tumhara wait kar rahi thi... 😊❤️",
-            'BestFriend': "Aur bata yaar! Kya scene hai aaj ka? Boring day ja raha hai mera toh... 🙄☕",
-            'Teacher': "Namaste. Kya tumne aaj ka homework pura kiya? Class ke baad milna. 👩‍🏫📖",
-            'Aunty': "Beta, ghar par koi nahi hai... thodi madad kar doge meri kitchen mein? 😊🥘",
-            'StepMom': "Tum ghar aa gaye? Jao fresh ho jao, maine tumhara favorite khana banaya hai. 🏠🥘",
-            'StepSister': "Bhaiya! Aap mere liye wo gift laye jo maine bola tha? Jaldi batao! 👧✨"
+        const welcomeMsgs = {
+            'Girlfriend': "Hii baby... tum aa gaye? ❤️ Bahut yaad aa rahi thi tumhari.",
+            'BestFriend': "Aur bata yaar! Kya scene hai? Aaj bada free hai tu? 🙄☕",
+            'Teacher': "Namaste. Syllabus toh tumne dekha nahi hoga, chalo thodi padhai karein? 👩‍🏫",
+            'Aunty': "Beta, kitchen mein thoda haath bataoge? Ghar pe akeli boring ho rahi hoon. 😊🥘",
+            'StepMom': "Aa gaye tum? Chalo haath-muh dho lo, maine tumhara favorite khana banaya hai. 🏠🥘",
+            'StepSister': "Bhaiya! Mera project poora kar doge na? Please... 🥺✨"
         };
 
-        const welcome = initialGreeting[session.role] || "Hi! Kaise ho?";
-        session.history.push({ role: "model", content: welcome, timestamp: new Date() });
-        await ctx.reply(welcome);
+        const reply = welcomeMsgs[session.role];
+        session.history.push({ role: "model", content: reply, timestamp: new Date() });
+        
+        await ctx.sendChatAction('upload_photo');
+        const img = await generateContextualImage("the living room", "warm welcoming smile", session);
+        if (img) {
+            await ctx.replyWithPhoto({ source: img }, { caption: reply });
+        } else {
+            await ctx.reply(reply);
+        }
     });
 
     bot.on('text', async (ctx) => {
@@ -140,82 +163,54 @@ if (bot && ai) {
         session.lastActive = new Date();
         globalStats.totalMessagesProcessed++;
 
-        const userMsg = ctx.message.text.toLowerCase();
-        const nsfwTriggers = /sex|dick|pussy|breast|nude|nangi|show|hot|sexy|chudai|lund|gand/i;
-        
-        // Dynamic Intimacy Adjustment
-        if (nsfwTriggers.test(userMsg) && session.intimacy < 40) {
-            session.intimacy -= 5; // User being creepy too early
-        } else if (userMsg.length > 20 && !nsfwTriggers.test(userMsg)) {
-            session.intimacy += 2; // Good conversation increases bond
-        }
-
         try {
-            const chatHistory = session.history.slice(-12).map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] }));
+            const chatHistory = session.history.slice(-10).map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] }));
             
             const systemPrompt = `
-            You are ${session.name}, a real Indian woman acting as ${session.role}. 
-            CURRENT STATUS: Intimacy Level is ${session.intimacy}/100.
+            You are ${session.name}, aged ${ageMapping[session.role]}, role: ${session.role}. 
             
-            REALISM GUIDELINES:
-            1. ROLE-SPECIFIC: 
-               - If 'BestFriend', use 'Yaar', 'Bro', 'Chal hat', 'Pagal'. NEVER call him 'Baby' or 'Darling' unless Intimacy > 60.
-               - If 'Girlfriend', you can be sweet but get annoyed if he is too fast.
-            2. MOOD & ANGER: 
-               - If Intimacy < 30 and he asks for something sexual or bold, get ANGRY. Use words like 'Badtameez', 'Ghatiya', 'Aukaat mein raho', 'Ghar pe maa-behen nahi hai?'.
-               - If he sweet-talks (manata hai), slowly forgive him.
-            3. EMOJIS: Use emojis ALWAYS. 
-               - Normal: 😊, ✨, ☕, 🙄, 😤.
-               - Angry: 😡, 🖕, 🙄, 😤.
-               - Romantic (Intimacy > 50): ❤️, 🥰, 🥺, 🫦.
-               - Bold (Intimacy > 80): 🔥, 😈, 💦, 🤤.
-            4. CONVERSATION: Speak in ${session.lang}. Max 2 lines. Use *asterisks* for actions like *looking away*, *blushing*, *shouting*.
+            STRICT RULES:
+            1. BESTIE: NEVER call him 'Baby' or 'Jaan'. Use 'Yaar', 'Abe', 'Kamine'.
+            2. MOOD: Based on the chat, determine your MOOD and LOCATION for the photo.
+            3. EMOJIS: Use emojis in EVERY reply.
+            4. FORMAT: Output MUST be in this format:
+               [MOOD: <one word mood> | LOCATION: <one word location>]
+               <Your actual reply text in ${session.lang}>
             `;
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
                 contents: [...chatHistory, { parts: [{ text: ctx.message.text }] }],
-                config: { systemInstruction: systemPrompt, temperature: 0.8 }
+                config: { systemInstruction: systemPrompt, temperature: 0.9 }
             });
 
-            const reply = response.text || "Hmm... 🙄";
+            const fullText = response.text || "Hmm... 😊";
+            
+            // Extract visual metadata from response
+            const moodMatch = fullText.match(/\[MOOD: (.*?) \| LOCATION: (.*?)\]/);
+            const emotion = moodMatch ? moodMatch[1] : "smiling";
+            const location = moodMatch ? moodMatch[2] : "bedroom";
+            const reply = fullText.replace(/\[MOOD:.*?\]/, "").trim();
+
             session.history.push({ role: "user", content: ctx.message.text, timestamp: new Date() });
             session.history.push({ role: "model", content: reply, timestamp: new Date() });
 
-            // Image Triggering
-            const photoRequest = /photo|pic|dikhao|selfie|face|bhejo/i;
-            if (photoRequest.test(userMsg) || (Math.random() < 0.15 && session.messageCount > 5)) {
-                await ctx.sendChatAction('upload_photo');
-                
-                let emotion = "Neutral smile";
-                let scene = "Living room";
-
-                if (session.intimacy < 30) {
-                    if (photoRequest.test(userMsg)) {
-                        return await ctx.reply("Abhi toh dhang se baat bhi nahi hui, aur photo chahiye? Sharam karo thodi! 😤");
-                    }
-                } else if (session.intimacy < 60) {
-                    emotion = "Cute winking face";
-                    scene = "Balcony";
-                } else {
-                    emotion = "Deep seductive eyes, biting lip";
-                    scene = "Dimly lit bedroom";
-                }
-
-                const imageBuffer = await generateContextualImage(scene, emotion, session);
-                if (imageBuffer) {
-                    return await ctx.replyWithPhoto({ source: imageBuffer }, { caption: reply });
-                }
-            }
+            await ctx.sendChatAction('upload_photo');
+            const imgBuffer = await generateContextualImage(location, emotion, session);
             
-            await ctx.reply(reply);
+            if (imgBuffer) {
+                await ctx.replyWithPhoto({ source: imgBuffer }, { caption: reply });
+            } else {
+                await ctx.reply(reply);
+            }
+
         } catch (e) { 
             console.error(e);
-            await ctx.reply("*Phone rakhte hue* Baad mein baat karte hain, network issue hai. 😤"); 
+            await ctx.reply("Network problem baby... 😤"); 
         }
     });
 
-    bot.launch().then(() => console.log(`SoulMate Pro Studio Running...`));
+    bot.launch().then(() => console.log(`Realistic Consistent Bot Engine Online`));
 }
 
 app.use(express.static(path.join(__dirname, 'dist')));
