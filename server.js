@@ -126,7 +126,7 @@ if (bot && ai) {
         session.name = namePools[session.role][Math.floor(Math.random() * namePools[session.role].length)];
         await ctx.answerCbQuery();
         try { await ctx.deleteMessage(); } catch (e) {}
-        const reply = `Hii... tum aa gaye? Bahut miss kiya maine tumhe. ❤️\nBatao, aaj ka din kaisa raha?`;
+        const reply = `Hii... tum aa gaye? Bahut miss kiya maine tumhe. ❤️\nBatao, aaj ka din kaisa raha? ✨`;
         session.history.push({ role: "model", content: reply, timestamp: new Date() });
         await ctx.sendChatAction('upload_photo');
         const img = await generateContextualImage("living room", "sweet smile", session);
@@ -143,11 +143,10 @@ if (bot && ai) {
         globalStats.totalMessagesProcessed++;
 
         const userMsg = ctx.message.text.toLowerCase();
+        const isRude = userMsg.match(/(sex|hot|nude|lund|chut|badtameez|ganda|rondi|randi|saali)/);
         
-        // Dynamic intimacy adjustment
-        const isRude = userMsg.match(/(sex|hot|nude|lund|chut|badtameez|ganda)/);
         if (isRude && session.intimacy < 45) {
-            session.intimacy -= 10;
+            session.intimacy -= 15;
         } else if (userMsg.length > 20) {
             session.intimacy += 2;
         }
@@ -159,26 +158,26 @@ if (bot && ai) {
             You are ${session.name}, role: ${session.role}. 
             INTIMACY: ${session.intimacy}/100.
             
-            RULES:
-            1. MINIMUM LENGTH: Your reply MUST be at least 2 lines long. Never give a single sentence.
-            2. ANGER SYSTEM: If Intimacy < 40 and user is being creepy/rude, GET ANGRY. Do not flirt. Be cold and defensive.
-            3. SPECIAL_PHOTO: If Intimacy > 60 and user asks for a photo/nude/spicy pic, include "[SEND_SPECIAL_PHOTO]" in your text.
-            4. VISUALS: Always start with [MOOD: <expression> | LOCATION: <place>].
-            5. LANGUAGE: Use only ${session.lang}.
-            6. PERSONALITY: If Bestie, use 'Abe', 'Yaar'. If Girlfriend, be sweet (unless angry).
+            STRICT RESPONSE RULES:
+            1. LENGTH: Your reply MUST be strictly 2 to 3 lines long. NOT MORE, NOT LESS.
+            2. EMOJIS: You MUST use 2-3 expressive emojis (❤️, ✨, 😍, 🙄, 🔥, 🫦) in EVERY reply unless you are angry.
+            3. ANGER SYSTEM: If Intimacy < 40 and user is being rude/creepy, GET REAL ANGRY. Use words like "Badtameez", "Hadd mein raho", "Sharam nahi aati?". If angry, do NOT use emojis and be very cold.
+            4. SPECIAL_PHOTO: If Intimacy > 60 AND user asks for a photo/spicy pic, include "[SEND_SPECIAL_PHOTO]" in your text.
+            5. VISUALS: Always start with [MOOD: <expression> | LOCATION: <place>].
+            6. LANGUAGE: Speak only in ${session.lang}.
             `;
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
                 contents: [...chatHistory, { parts: [{ text: ctx.message.text }] }],
-                config: { systemInstruction: systemPrompt, temperature: 0.9 }
+                config: { systemInstruction: systemPrompt, temperature: 0.85 }
             });
 
-            const rawResponse = response.text || "Main soch rahi hoon... 😊\nBatao aur kya chal raha hai?";
+            const rawResponse = response.text || "Mmm... Main kuch soch rahi hoon... 😊\nBatao aur kya chal raha hai? ✨";
             
             const metaMatch = rawResponse.match(/\[MOOD: (.*?) \| LOCATION: (.*?)\]/);
             const emotion = metaMatch ? metaMatch[1] : (session.intimacy < 40 ? "angry" : "smiling");
-            const location = metaMatch ? metaMatch[2] : "bedroom";
+            const location = metaMatch ? metaMatch[2] : "living room";
             const reply = rawResponse.replace(/\[MOOD:.*?\]/, "").replace("[SEND_SPECIAL_PHOTO]", "").trim();
 
             session.history.push({ role: "user", content: ctx.message.text, timestamp: new Date() });
@@ -186,7 +185,6 @@ if (bot && ai) {
 
             await ctx.sendChatAction('upload_photo');
 
-            // Logic to send GitHub photo vs Generated photo
             if (rawResponse.includes("[SEND_SPECIAL_PHOTO]") && specialPhotos.length > 0) {
                 const randomSpecial = specialPhotos[Math.floor(Math.random() * specialPhotos.length)];
                 await ctx.replyWithPhoto(randomSpecial, { caption: reply });
@@ -198,7 +196,7 @@ if (bot && ai) {
 
         } catch (e) { 
             console.error(e);
-            await ctx.reply("Mujhe thoda gussa aa raha hai... network issue hai.\nChalo baad mein baat karte hain."); 
+            await ctx.reply("Net issue ho gaya baby... 😤\nThodi der baad baat karte hain? ✨"); 
         }
     });
 
