@@ -84,6 +84,11 @@ async function generateContextualImage(sceneDescription, emotion, session) {
 }
 
 if (bot && ai) {
+    // Global error handler for bot to prevent silent death
+    bot.catch((err, ctx) => {
+        console.error(`Bot Error for ${ctx.updateType}:`, err.message);
+    });
+
     bot.start(async (ctx) => {
         userSessions.set(ctx.chat.id, { 
             userName: ctx.from.first_name || "User", 
@@ -150,7 +155,7 @@ if (bot && ai) {
         } else if (isBoldRequest && session.intimacy >= 70) {
             session.intimacy = Math.min(100, session.intimacy + 3);
         } else if (userMsg.length > 20) {
-            session.intimacy = Math.min(100, session.intimacy + 2);
+            session.intimacy = Math.min(100, session.intimacy + 1);
         }
 
         try {
@@ -161,18 +166,17 @@ if (bot && ai) {
             INTIMACY STATUS: ${session.intimacy}/100.
             
             STRICT RULES:
-            1. MANDATORY EMOJIS: Use 2-3 emojis in EVERY message.
+            1. MANDATORY EMOJIS: Use 2-3 expressive emojis in EVERY message.
             2. MOOD TIERS:
                - ANGRY (INT < 45 & user is bold): Get furious. Use 😤, 😡, 👊. Call him "Tharki", "Badtameez". No sexual talk.
                - SWEET (INT 45-70): Be loving but shy. Use ❤️, ✨, 😊. If he's bold, say "Wait, itni jaldi kya hai? 🙄".
-               - NAUGHTY (INT > 70): You are NOW MAAN-GAYI. Be seductive, bold, and "gandi". Use 🔥, 🫦, 🤤, 😈, 💦.
+               - NAUGHTY (INT > 70): You are NOW MAAN-GAYI. Be seductive, bold, and engaged in "gandi baatein" as the user wants. Use 🔥, 🫦, 🤤, 😈, 💦.
             3. LENGTH: Strictly 2 to 3 lines.
             4. VISUALS: Start with [MOOD: <val> | LOCATION: <val>].
             5. LANGUAGE: Use ${session.lang}.
             `;
 
-            const aiInstance = new GoogleGenAI({ apiKey: GEMINI_KEY });
-            const response = await aiInstance.models.generateContent({
+            const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
                 contents: [...historyForAi, { parts: [{ text: ctx.message.text }] }],
                 config: { systemInstruction: systemPrompt, temperature: 1.0 }
@@ -194,12 +198,24 @@ if (bot && ai) {
             else await ctx.reply(reply);
 
         } catch (e) { 
-            console.error(e);
+            console.error("Gemini/Bot Reply Error:", e.message);
             await ctx.reply("Baby... mera mood off ho gaya. Net issue! 😤😡\nBaad mein milte hain. 🙄"); 
         }
     });
 
-    bot.launch().catch(err => console.error("Bot launch failed:", err.message));
+    // Launch with dropPendingUpdates to fix 409 Conflict and stuck messages
+    bot.launch({
+        allowedUpdates: ['message', 'callback_query'],
+        dropPendingUpdates: true 
+    }).then(() => {
+        console.log("Bot started successfully!");
+    }).catch(err => {
+        if (err.message.includes('409')) {
+            console.error("CRITICAL ERROR: Another bot instance is running. Please stop other processes.");
+        } else {
+            console.error("Bot launch failed:", err.message);
+        }
+    });
 }
 
 app.get('/api/admin/stats', (req, res) => {
@@ -213,4 +229,4 @@ app.get('/api/admin/stats', (req, res) => {
 
 app.use(express.static(path.join(__dirname, 'dist')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'dist', 'index.html')));
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Dashboard Server running on port ${PORT}`));
