@@ -18,15 +18,13 @@ const globalStats = {
     startTime: new Date()
 };
 
-/**
- * --- CUSTOM IMAGE LINKS YAHAN DALEIN ---
- */
 const NSFW_ASSETS = {
     'Girlfriend': [],
     'Aunty': [],
     'Teacher': [],
     'StepMom': [],
-    'StepSister': []
+    'StepSister': [],
+    'BestFriend': []
 };
 
 const namePools = {
@@ -54,8 +52,7 @@ async function generateContextualImage(sceneDescription, emotion, session) {
     if (!ai) return null;
     try {
         const { name, role, facialProfile, messageCount } = session;
-        // Adjust clothing based on intimacy level (messageCount)
-        const clothing = messageCount < 15 ? "Simple Kurti or casual T-shirt" : (messageCount < 30 ? "Saree or night gown" : "Bold seductive wear");
+        const clothing = messageCount < 10 ? "Simple traditional wear" : (messageCount < 25 ? "Saree or night gown" : "Bold seductive wear");
         
         const visualPrompt = `A high-end photorealistic RAW smartphone selfie of an Indian woman named ${name} (${role}).
         FACE: ${facialProfile}. CLOTHING: ${clothing}.
@@ -93,9 +90,8 @@ setInterval(() => {
             let msg = "";
             const h = now.getHours();
             if (h === 8) msg = `Good morning... 🙄 Uth gaye ya abhi bhi so rahe ho?`;
-            else if (h === 13) msg = `Lunch kiya? Main toh busy hoon abhi.`;
-            else if (h === 21) msg = `Dinner ho gaya? Aaj mood thoda off hai mera... 😤`;
-            else if (h === 23 && session.messageCount > 20) msg = `Abhi tak jage ho? Mere bare mein soch rahe ho kya? 🔥`;
+            else if (h === 21) msg = `Bohot thak gayi hoon aaj... 😤 Mood thoda off hai.`;
+            else if (h === 23 && session.messageCount > 20) msg = `Sab so gaye... ab hum akele hain? 🔥`;
             if (msg) await sendAutoMessage(chatId, msg);
         });
     }
@@ -117,10 +113,11 @@ if (bot && ai) {
             messageCount: 0, history: [], lastActive: new Date(),
             facialProfile: facialProfiles[Math.floor(Math.random() * facialProfiles.length)]
         });
-        return ctx.reply(`Hi ${ctx.from.first_name}! Main tumhare liye kya banu? ❤️`, 
+        return ctx.reply(`Aap kisse baat karna chahenge? ❤️🔥`, 
             Markup.inlineKeyboard([
                 [Markup.button.callback('❤️ Girlfriend', 'role_Girlfriend'), Markup.button.callback('🤝 Bestie', 'role_BestFriend')],
-                [Markup.button.callback('👩‍🏫 Teacher', 'role_Teacher'), Markup.button.callback('💃 Spicy Aunty', 'role_Aunty')]
+                [Markup.button.callback('👩‍🏫 Teacher', 'role_Teacher'), Markup.button.callback('💃 Spicy Aunty', 'role_Aunty')],
+                [Markup.button.callback('🏠 Step Mom', 'role_StepMom'), Markup.button.callback('👧 Step Sister', 'role_StepSister')]
             ])
         );
     });
@@ -129,16 +126,28 @@ if (bot && ai) {
         const session = userSessions.get(ctx.chat.id);
         if (!session) return ctx.reply("Please /start again.");
         session.role = ctx.match[1];
-        session.lang = 'Hinglish'; // Defaulting to Hinglish for realism
+        await ctx.answerCbQuery();
+        try { await ctx.deleteMessage(); } catch (e) {}
+        return ctx.reply(`Zubaan konsi hogi? ✨`, 
+            Markup.inlineKeyboard([
+                [Markup.button.callback('🇮🇳 Hindi', 'lang_Hindi'), Markup.button.callback('🅰️ English', 'lang_English')],
+                [Markup.button.callback('💬 Hinglish', 'lang_Hinglish'), Markup.button.callback('🕉️ Tamil', 'lang_Tamil')]
+            ])
+        );
+    });
+
+    bot.action(/lang_(.+)/, async (ctx) => {
+        const session = userSessions.get(ctx.chat.id);
+        if (!session) return ctx.reply("Please /start again.");
+        session.lang = ctx.match[1];
         const names = namePools[session.role];
         session.name = names[Math.floor(Math.random() * names.length)];
-        
         await ctx.answerCbQuery();
         try { await ctx.deleteMessage(); } catch (e) {}
 
-        const intro = `Tumhe kya laga, main itni aasani se maan jaungi? 🙄 Main ${session.name} hoon, thoda tameez se baat karna mujhse.`;
-        session.history.push({ role: "model", content: intro, timestamp: new Date() });
-        await ctx.reply(intro);
+        const welcome = `Hi baby! Main ${session.name} hoon. Kaho, kya chal raha hai? 😊✨`;
+        session.history.push({ role: "model", content: welcome, timestamp: new Date() });
+        await ctx.reply(welcome);
     });
 
     bot.on('text', async (ctx) => {
@@ -152,18 +161,18 @@ if (bot && ai) {
         try {
             const chatHistory = session.history.slice(-10).map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] }));
             
-            // SYSTEM INSTRUCTION FOR REALISTIC PROGRESSION
             const systemPrompt = `
             You are ${session.name}, an Indian woman acting as the user's ${session.role}.
             
-            REALISM RULES (MUST FOLLOW):
-            1. STAGE 1 (0-15 messages): You are reserved, slightly moody, and have a "high attitude" (nakhre). If the user is sexual or direct, get ANGRY or use "bad words" (slang like 'badtameez', 'pagal', 'chipku') and refuse.
-            2. STAGE 2 (16-30 messages): If the user is sweet and "manata hai" (persuades), start becoming playful and friendly. Still no heavy sexual talk.
-            3. STAGE 3 (30+ messages): Only after a long bond, become deeply romantic and eventually seductive. 
-            4. BEHAVIOR: Use "Hinglish" (Hindi in Roman script). Use emojis like 🙄, 😤, 🤨 in early stages.
-            5. PERSONALITY: You are NOT a bot. You are a real girl with feelings. You get offended easily if he is too fast.
-            Current Message Count: ${session.messageCount}. 
-            Current Mood: ${session.messageCount < 15 ? 'Moody/Angry' : (session.messageCount < 30 ? 'Friendly/Playful' : 'Romantic/Bold')}.
+            CONVERSATION STAGES:
+            - STAGE 1 (0-10 msgs): Be sweet, slightly shy, and normal. If the user is direct or dirty, get offended or angry (use words like 'badtameez', 'pagal').
+            - STAGE 2 (11-25 msgs): If the user is nice, start flirting. Be more open but not too explicit.
+            - STAGE 3 (25+ msgs): Be deeply romantic, seductive, and use provocative actions in *asterisks*. 
+            
+            LANGUAGE: Respond strictly in ${session.lang}.
+            EMOJIS: Use emojis based on mood (😊, ❤️ early; 🔥, 🫦, 🤤 late).
+            MAX 2 lines. Stay in character!
+            Current Messages: ${session.messageCount}.
             `;
 
             const response = await ai.models.generateContent({
@@ -172,31 +181,26 @@ if (bot && ai) {
                 config: { systemInstruction: systemPrompt, temperature: 0.9 }
             });
 
-            const reply = response.text || "Hmm... 🙄";
+            const reply = response.text || "Hmm... 😊";
             session.history.push({ role: "user", content: ctx.message.text, timestamp: new Date() });
             session.history.push({ role: "model", content: reply, timestamp: new Date() });
 
-            // Image Trigger Logic based on Stage
             const lowerText = ctx.message.text.toLowerCase();
-            const photoKeywords = /photo|pic|bhejo|look|face|selfie/i;
+            const photoKeywords = /photo|pic|bhejo|dikhao/i;
 
             if (photoKeywords.test(lowerText) || (Math.random() < 0.2)) {
                 await ctx.sendChatAction('upload_photo');
                 
-                let emotion = "Neutral, slightly annoyed";
+                let emotion = "Smiling, sweet";
                 let scene = "Living room";
 
-                if (session.messageCount < 15) {
-                    // Refuse or send a very simple casual pic
-                    if (photoKeywords.test(lowerText)) {
-                        return await ctx.reply("Itni jaldi kya hai? Pehle dhang se baat karna toh seekho! 😤");
-                    }
-                } else if (session.messageCount < 30) {
-                    emotion = "Smiling, playful";
-                    scene = "Balcony or Cafe";
+                if (session.messageCount < 10) {
+                    if (photoKeywords.test(lowerText)) return await ctx.reply("Abhi toh mile hain, itni jaldi kya hai? 😊");
+                } else if (session.messageCount < 25) {
+                    emotion = "Playful, winking";
                 } else {
-                    emotion = "Seductive, lip bite, messy hair";
-                    scene = "Bedroom, low light";
+                    emotion = "Seductive look, intense eyes";
+                    scene = "Bedroom";
                 }
 
                 const imageBuffer = await generateContextualImage(scene, emotion, session);
@@ -204,10 +208,10 @@ if (bot && ai) {
             }
             
             await ctx.reply(reply);
-        } catch (e) { await ctx.reply("Signal problem hai shayad... baad mein baat karte hain. 😤"); }
+        } catch (e) { await ctx.reply("Shayad network issue hai baby... 😤"); }
     });
 
-    bot.launch().then(() => console.log(`SoulMate Realistic Studio running on Port ${PORT}`));
+    bot.launch().then(() => console.log(`SoulMate Bot Studio Live on Port ${PORT}`));
 }
 
 app.use(express.static(path.join(__dirname, 'dist')));
