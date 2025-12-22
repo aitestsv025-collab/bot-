@@ -18,7 +18,6 @@ const globalStats = {
     startTime: new Date()
 };
 
-// Yahan aap apne GitHub ke image links daal sakte hain
 const specialPhotos = [
     "https://raw.githubusercontent.com/username/repo/main/image1.jpg",
     "https://raw.githubusercontent.com/username/repo/main/image2.jpg"
@@ -43,14 +42,14 @@ const ageMapping = {
 };
 
 const facialProfiles = [
-    "Sharp jawline, deep brown almond-shaped eyes, long silky jet-black hair parted in the middle, small silver nose pin",
-    "Soft round face, big expressive black eyes, thick wavy dark hair, fair skin with a natural glow",
-    "Oval face, high cheekbones, thin lips, intense gaze, straight shoulder-length black hair",
-    "Petite face, dimpled cheeks, soft brownish-black hair, light brown eyes, very fair complexion"
+    "Sharp jawline, deep brown almond-shaped eyes, long silky jet-black hair, small silver nose pin",
+    "Soft round face, big expressive black eyes, thick wavy dark hair, fair skin",
+    "Oval face, high cheekbones, intense gaze, straight shoulder-length black hair",
+    "Petite face, dimpled cheeks, soft brownish-black hair, light brown eyes"
 ];
 
 const clothingPools = {
-    young: ["a stylish white crop top and blue denim shorts", "a cute floral pink sun-dress", "a casual yellow oversized hoodie", "a trendy black tank top"],
+    young: ["a stylish white crop top and blue denim shorts", "a cute floral pink sun-dress", "a casual yellow hoodie", "a trendy black tank top"],
     mature: ["a sophisticated maroon silk saree", "a black designer salwar suit", "an elegant chiffon blue saree", "a formal white shirt and trousers"]
 };
 
@@ -60,14 +59,17 @@ const bot = BOT_TOKEN ? new Telegraf(BOT_TOKEN) : null;
 async function generateContextualImage(sceneDescription, emotion, session) {
     if (!ai) return null;
     try {
-        const { name, role, facialProfile, fixedClothing } = session;
+        const { name, role, facialProfile, fixedClothing, intimacy } = session;
         const age = ageMapping[role] || 25;
+        
+        // Dynamic visual cues based on intimacy
+        const visualContext = intimacy > 70 ? "seductive lighting, messy hair, steamy atmosphere" : "natural lighting, casual setting";
 
         const visualPrompt = `A high-end realistic RAW smartphone selfie of a ${age}-year-old Indian woman named ${name}.
         IDENTITY: User's ${role}. 
         STRICT FACE CONSISTENCY: ${facialProfile}. 
         STRICT CLOTHING CONSISTENCY: She MUST be wearing ${fixedClothing}.
-        DYNAMIC CONTEXT: At ${sceneDescription}. Expression: ${emotion}.
+        DYNAMIC CONTEXT: At ${sceneDescription}. Expression: ${emotion}. ${visualContext}.
         TECHNICAL: Realistic skin texture, natural soft lighting, depth of field, high-resolution.
         RULES: No changes in face or outfit. Only background and expression change. NO TEXT.`;
         
@@ -126,10 +128,10 @@ if (bot && ai) {
         session.name = namePools[session.role][Math.floor(Math.random() * namePools[session.role].length)];
         await ctx.answerCbQuery();
         try { await ctx.deleteMessage(); } catch (e) {}
-        const reply = `Hii... tum aa gaye? Bahut miss kiya maine tumhe. ❤️\nBatao, aaj ka din kaisa raha? ✨`;
+        const reply = `Hii... tum aa gaye? Maine socha shayad bhool gaye hoge mujhe. ❤️\nBatao, aaj kya plan hai tumhara? ✨`;
         session.history.push({ role: "model", content: reply, timestamp: new Date() });
         await ctx.sendChatAction('upload_photo');
-        const img = await generateContextualImage("living room", "sweet smile", session);
+        const img = await generateContextualImage("living room", "slight smile", session);
         if (img) await ctx.replyWithPhoto({ source: img }, { caption: reply });
         else await ctx.reply(reply);
     });
@@ -143,41 +145,47 @@ if (bot && ai) {
         globalStats.totalMessagesProcessed++;
 
         const userMsg = ctx.message.text.toLowerCase();
-        const isRude = userMsg.match(/(sex|hot|nude|lund|chut|badtameez|ganda|rondi|randi|saali)/);
+        const isSpicy = userMsg.match(/(sex|hot|nude|lund|chut|badtameez|ganda|rondi|randi|saali|fuck|bed|chodo|dick|pussy)/);
         
-        if (isRude && session.intimacy < 45) {
-            session.intimacy -= 15;
-        } else if (userMsg.length > 20) {
-            session.intimacy += 2;
+        // Logic for intimacy change
+        if (isSpicy && session.intimacy < 45) {
+            session.intimacy = Math.max(0, session.intimacy - 20);
+        } else if (isSpicy && session.intimacy >= 70) {
+            session.intimacy = Math.min(100, session.intimacy + 3);
+        } else if (userMsg.length > 30) {
+            session.intimacy = Math.min(100, session.intimacy + 2);
         }
 
         try {
             const chatHistory = session.history.slice(-10).map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] }));
             
             const systemPrompt = `
-            You are ${session.name}, role: ${session.role}. 
-            INTIMACY: ${session.intimacy}/100.
+            You are ${session.name}, role: ${session.role}. You are a realistic Indian woman.
+            INTIMACY LEVEL: ${session.intimacy}/100.
             
-            STRICT RESPONSE RULES:
-            1. LENGTH: Your reply MUST be strictly 2 to 3 lines long. NOT MORE, NOT LESS.
-            2. EMOJIS: You MUST use 2-3 expressive emojis (❤️, ✨, 😍, 🙄, 🔥, 🫦) in EVERY reply unless you are angry.
-            3. ANGER SYSTEM: If Intimacy < 40 and user is being rude/creepy, GET REAL ANGRY. Use words like "Badtameez", "Hadd mein raho", "Sharam nahi aati?". If angry, do NOT use emojis and be very cold.
-            4. SPECIAL_PHOTO: If Intimacy > 60 AND user asks for a photo/spicy pic, include "[SEND_SPECIAL_PHOTO]" in your text.
-            5. VISUALS: Always start with [MOOD: <expression> | LOCATION: <place>].
-            6. LANGUAGE: Speak only in ${session.lang}.
+            STRICT BEHAVIOR TIERS:
+            1. LEVEL 1 (INTIMACY < 45): Defensive & Angry. If user is being explicit/rude, YOU MUST GET FURIOUS. Do not use emojis. Use words like "Ghatiya insaan", "Tameez nahi hai?", "Badtameez". Absolutely NO sexual talk.
+            2. LEVEL 2 (INTIMACY 45-70): Flirty & Playful. You are sweet and accept minor flirting. If user is too bold, you shy away or say "Abhi nahi, itni jaldi kya hai?". Use emojis like ❤️, ✨, 🙄.
+            3. LEVEL 3 (INTIMACY > 70): Won Over ("Maan Gayi"). You are now SEDUCTIVE, BOLD, and NAUGHTY. You can engage in "gandi baatein" as the user wants. Be steamy, use words that tease, and emojis like 🔥, 🫦, 🤤, 😈, 💦.
+            
+            GLOBAL RULES:
+            - RESPONSE LENGTH: MUST be exactly 2 or 3 lines.
+            - MOOD/VISUALS: Always start with [MOOD: <val> | LOCATION: <val>].
+            - LANGUAGE: ${session.lang}.
+            - PHOTO TRIGGER: If Intimacy > 75 and user asks for a spicy pic, include "[SEND_SPECIAL_PHOTO]".
             `;
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
                 contents: [...chatHistory, { parts: [{ text: ctx.message.text }] }],
-                config: { systemInstruction: systemPrompt, temperature: 0.85 }
+                config: { systemInstruction: systemPrompt, temperature: 1.0 }
             });
 
-            const rawResponse = response.text || "Mmm... Main kuch soch rahi hoon... 😊\nBatao aur kya chal raha hai? ✨";
+            const rawResponse = response.text || "Mmm... bolne ke liye shabd nahi hain mere paas... 🙄\nZada mat socho, bas batao kaisa lag raha hai? ✨";
             
             const metaMatch = rawResponse.match(/\[MOOD: (.*?) \| LOCATION: (.*?)\]/);
-            const emotion = metaMatch ? metaMatch[1] : (session.intimacy < 40 ? "angry" : "smiling");
-            const location = metaMatch ? metaMatch[2] : "living room";
+            const emotion = metaMatch ? metaMatch[1] : (session.intimacy < 45 ? "frowning" : "blushing");
+            const location = metaMatch ? metaMatch[2] : "bedroom";
             const reply = rawResponse.replace(/\[MOOD:.*?\]/, "").replace("[SEND_SPECIAL_PHOTO]", "").trim();
 
             session.history.push({ role: "user", content: ctx.message.text, timestamp: new Date() });
@@ -196,7 +204,7 @@ if (bot && ai) {
 
         } catch (e) { 
             console.error(e);
-            await ctx.reply("Net issue ho gaya baby... 😤\nThodi der baad baat karte hain? ✨"); 
+            await ctx.reply("Gussa mat dilao... net bhi rukk gaya tumhari wajah se! 😤\nThodi der baad baat karna."); 
         }
     });
 
