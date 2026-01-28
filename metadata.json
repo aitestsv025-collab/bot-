@@ -2,6 +2,7 @@
   "name": "SoulMate AI - Bot Studio",
   "description": "A high-end dashboard to configure, simulate, and manage your AI Girlfriend Telegram Bot personality using Gemini 3.",
   "requestFramePermissions": [
-    "microphone"
+    "microphone",
+    "camera"
   ]
 }

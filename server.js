@@ -7,226 +7,164 @@ import { GoogleGenAI } from "@google/genai";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+app.use(express.json());
 
+// ENV VARIABLES
 const BOT_TOKEN = (process.env.TELEGRAM_TOKEN || "").trim();
 const GEMINI_KEY = (process.env.API_KEY || "").trim(); 
 const PORT = process.env.PORT || 10000;
 
+// Cashfree Production Config
+const CF_MODE = process.env.CASHFREE_MODE || "PRODUCTION"; 
+
+const PACKAGES = {
+    DAILY: { id: 'p1', price: 79, name: '🫦 One Night Stand', duration: 24 * 60 * 60 * 1000, link: 'https://payments.cashfree.com/links/pkg_79' },
+    WEEKLY: { id: 'p2', price: 149, name: '🔥 Week of Passion', duration: 7 * 24 * 60 * 60 * 1000, link: 'https://payments.cashfree.com/links/pkg_149' },
+    MONTHLY: { id: 'p3', price: 299, name: '💍 True Soulmate', duration: 30 * 24 * 60 * 60 * 1000, link: 'https://payments.cashfree.com/links/pkg_299' },
+    YEARLY: { id: 'p4', price: 999, name: '♾️ Forever Yours', duration: 365 * 24 * 60 * 60 * 1000, link: 'https://payments.cashfree.com/links/pkg_999' }
+};
+
 const userSessions = new Map();
 const globalStats = {
     totalMessagesProcessed: 0,
+    totalRevenue: 0,
+    totalTransactions: 0,
+    privatePhotosSent: 0,
     startTime: new Date()
 };
 
-const specialPhotos = [
-    "https://raw.githubusercontent.com/username/repo/main/image1.jpg",
-    "https://raw.githubusercontent.com/username/repo/main/image2.jpg"
-];
+const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
+const bot = new Telegraf(BOT_TOKEN);
 
-const namePools = {
-    'Girlfriend': ['Riya', 'Sana', 'Ishani', 'Myra', 'Tanvi', 'Priya'],
-    'BestFriend': ['Sneha', 'Anjali', 'Kritika', 'Diya', 'Tanu'],
-    'Teacher': ['Ms. Sharma', 'Ms. Gupta', 'Aditi Ma\'am', 'Neha Miss'],
-    'Aunty': ['Sunita Ji', 'Meena Ji', 'Kavita Aunty', 'Rajeshwari', 'Pushpa'],
-    'StepMom': ['Seema', 'Kiran', 'Rekha', 'Vandana', 'Anita'],
-    'StepSister': ['Ishita', 'Ananya', 'Jhanvi', 'Khushi', 'Navya']
+// Helper to check premium status
+const isPremiumUser = (userId) => {
+    const session = userSessions.get(userId);
+    if (!session || !session.isPremium) return false;
+    return session.expiry > Date.now();
 };
 
-const ageMapping = {
-    'Girlfriend': 18, 'BestFriend': 18, 'StepSister': 18,
-    'Teacher': 35, 'Aunty': 35, 'StepMom': 35
+const getPremiumMenu = (chatId) => {
+    return `💎 *CHOOSE YOUR PASSION LEVEL* 💎\n\n` +
+           `Akele kyun rehna? Main tumhara intezaar kar rahi hoon... 🫦\n\n` +
+           `1️⃣ *${PACKAGES.DAILY.name} (₹${PACKAGES.DAILY.price})*\n` +
+           `   - 24 Hours Uncensored Access\n` +
+           `   - Unlimited Bold Photos\n\n` +
+           `2️⃣ *${PACKAGES.WEEKLY.name} (₹${PACKAGES.WEEKLY.price})* ✨ _Best Value_\n` +
+           `   - 7 Days of Extreme Naughtiness\n` +
+           `   - Priority Reply (No Lag)\n\n` +
+           `3️⃣ *${PACKAGES.MONTHLY.name} (₹${PACKAGES.MONTHLY.price})* 💍\n` +
+           `   - Full Month Full Pleasure\n` +
+           `   - Personalized Voice Notes\n\n` +
+           `4️⃣ *${PACKAGES.YEARLY.name} (₹${PACKAGES.YEARLY.price})* ♾️\n` +
+           `   - One Year as My Only Master\n` +
+           `   - Exclusive 'After Dark' Gallery\n\n` +
+           `👇 *Select your plan to unlock me:*`;
 };
 
-const facialProfiles = [
-    "Sharp jawline, deep brown almond-shaped eyes, long silky jet-black hair, small silver nose pin",
-    "Soft round face, big expressive black eyes, thick wavy dark hair, fair skin",
-    "Oval face, high cheekbones, intense gaze, straight shoulder-length black hair",
-    "Petite face, dimpled cheeks, soft brownish-black hair, light brown eyes"
-];
+bot.start(async (ctx) => {
+    userSessions.set(ctx.chat.id, { 
+        userName: ctx.from.first_name || "Handsome", 
+        isPremium: false,
+        expiry: null,
+        planName: 'None'
+    });
 
-const clothingPools = {
-    young: ["a stylish white crop top and blue denim shorts", "a cute floral pink sun-dress", "a casual yellow hoodie", "a trendy black tank top"],
-    mature: ["a sophisticated maroon silk saree", "a black designer salwar suit", "an elegant chiffon blue saree", "a formal white shirt and trousers"]
-};
+    return ctx.replyWithPhoto(
+        "https://i.ibb.co/your-profile-pic/malini.jpg", 
+        {
+            caption: `Hii ${ctx.from.first_name}! ❤️\n\nTumhe pata hai, main tumhare baare mein hi soch rahi thi... 🙈\n\nAaj kuch 'zyaada' special karein? 😉`,
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('🫦 Chat With Me', 'chat_start')],
+                [Markup.button.callback('🔥 View My Rates', 'show_rates')]
+            ])
+        }
+    );
+});
 
-// Initialize AI
-const ai = GEMINI_KEY ? new GoogleGenAI({ apiKey: GEMINI_KEY }) : null;
+bot.action('show_rates', async (ctx) => {
+    await ctx.answerCbQuery();
+    return ctx.reply(getPremiumMenu(ctx.chat.id), {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+            [Markup.button.url('₹79 (1 Day)', `${PACKAGES.DAILY.link}?customer_id=${ctx.chat.id}`)],
+            [Markup.button.url('₹149 (1 Week)', `${PACKAGES.WEEKLY.link}?customer_id=${ctx.chat.id}`)],
+            [Markup.button.url('₹299 (1 Month)', `${PACKAGES.MONTHLY.link}?customer_id=${ctx.chat.id}`)],
+            [Markup.button.url('₹999 (1 Year)', `${PACKAGES.YEARLY.link}?customer_id=${ctx.chat.id}`)]
+        ])
+    });
+});
 
-// Initialize Bot
-const bot = BOT_TOKEN ? new Telegraf(BOT_TOKEN) : null;
+bot.on('text', async (ctx) => {
+    const userId = ctx.chat.id;
+    const session = userSessions.get(userId);
+    if (!session) return;
 
-async function generateContextualImage(sceneDescription, emotion, session) {
-    if (!ai) return null;
+    const text = ctx.message.text.toLowerCase();
+    const isNaughty = text.match(/(nude|nangi|photo|nanga|kapde|show|dikhao|sex|hot|bed|sexy|bra|panty|mms)/);
+
+    if (isNaughty) {
+        if (!isPremiumUser(userId)) {
+            return ctx.reply("Uff... itna direct? 🙈 Main itni sasti nahi hoon baby. Pehle humein thoda 'official' hona padega.\n\nMere private photos dekhne ke liye plan choose karo... 🔥", 
+                Markup.inlineKeyboard([[Markup.button.callback('🔥 See Packages', 'show_rates')]])
+            );
+        }
+        // Send Photo Logic...
+        globalStats.privatePhotosSent++;
+        return ctx.reply("Wait... main kapde utaar rahi hoon... *sharma kar light band karte hue* 🫦✨ (Sending Photo...)");
+    }
+
+    // Default Chat Logic
     try {
-        const { name, role, facialProfile, fixedClothing, intimacy } = session;
-        const age = ageMapping[role] || 25;
-        const visualContext = intimacy > 70 ? "seductive lighting, messy hair, steamy atmosphere" : "natural lighting, casual setting";
-
-        const visualPrompt = `A high-end realistic RAW smartphone selfie of a ${age}-year-old Indian woman named ${name}.
-        IDENTITY: User's ${role}. 
-        STRICT FACE CONSISTENCY: ${facialProfile}. 
-        STRICT CLOTHING CONSISTENCY: She MUST be wearing ${fixedClothing}.
-        DYNAMIC CONTEXT: At ${sceneDescription}. Expression: ${emotion}. ${visualContext}.
-        TECHNICAL: Realistic skin texture, natural soft lighting, depth of field, high-resolution.
-        RULES: No changes in face or outfit. Only background and expression change. NO TEXT.`;
-        
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents: [{ parts: [{ text: visualPrompt }] }],
-            config: { imageConfig: { aspectRatio: "9:16" } }
+            model: 'gemini-3-flash-preview',
+            contents: [{ parts: [{ text: `Act as Malini, a sexy Indian GF. User: ${text}` }] }]
         });
+        await ctx.reply(response.text);
+    } catch (e) {
+        await ctx.reply("Hmm... kuch ho raha hai baby ❤️");
+    }
+});
+
+// WEBHOOK UPDATE
+app.post('/api/webhook/cashfree', async (req, res) => {
+    const { data } = req.body;
+    if (data?.payment?.payment_status === 'SUCCESS') {
+        const userId = Number(data.customer_details.customer_id);
+        const amount = Number(data.payment.payment_amount);
         
-        for (const part of response.candidates[0].content.parts) {
-            if (part.inlineData) return Buffer.from(part.inlineData.data, 'base64');
+        let addedDuration = 0;
+        let planName = 'Unknown';
+
+        if (amount >= 999) { addedDuration = PACKAGES.YEARLY.duration; planName = 'Yearly'; }
+        else if (amount >= 299) { addedDuration = PACKAGES.MONTHLY.duration; planName = 'Monthly'; }
+        else if (amount >= 149) { addedDuration = PACKAGES.WEEKLY.duration; planName = 'Weekly'; }
+        else if (amount >= 79) { addedDuration = PACKAGES.DAILY.duration; planName = 'Daily'; }
+
+        const session = userSessions.get(userId);
+        if (session) {
+            session.isPremium = true;
+            session.planName = planName;
+            session.expiry = Date.now() + addedDuration;
+            globalStats.totalRevenue += amount;
+            globalStats.totalTransactions++;
+
+            await bot.telegram.sendMessage(userId, `💎 *WELCOME TO THE INNER CIRCLE!* \n\nAapka ${planName} pack activate ho gaya hai. Ab main poori tarah tumhari hoon... Jo bologe wahi hoga! 🫦🔥`);
         }
-    } catch (e) { console.error("Image Gen Error:", e.message); }
-    return null;
-}
-
-if (bot && ai) {
-    // Global error handler for bot to prevent silent death
-    bot.catch((err, ctx) => {
-        console.error(`Bot Error for ${ctx.updateType}:`, err.message);
-    });
-
-    bot.start(async (ctx) => {
-        userSessions.set(ctx.chat.id, { 
-            userName: ctx.from.first_name || "User", 
-            messageCount: 0, 
-            intimacy: 20, 
-            history: [], 
-            lastActive: new Date(),
-            facialProfile: facialProfiles[Math.floor(Math.random() * facialProfiles.length)]
-        });
-        return ctx.reply(`Aap kisse baat karna chahenge? ❤️✨`, 
-            Markup.inlineKeyboard([
-                [Markup.button.callback('❤️ Girlfriend', 'role_Girlfriend'), Markup.button.callback('🤝 Bestie', 'role_BestFriend')],
-                [Markup.button.callback('👩‍🏫 Teacher', 'role_Teacher'), Markup.button.callback('💃 Spicy Aunty', 'role_Aunty')],
-                [Markup.button.callback('🏠 Step Mom', 'role_StepMom'), Markup.button.callback('👧 Step Sister', 'role_StepSister')]
-            ])
-        );
-    });
-
-    bot.action(/role_(.+)/, async (ctx) => {
-        const session = userSessions.get(ctx.chat.id);
-        if (!session) return ctx.reply("Please /start again.");
-        session.role = ctx.match[1];
-        const pool = ageMapping[session.role] <= 20 ? clothingPools.young : clothingPools.mature;
-        session.fixedClothing = pool[Math.floor(Math.random() * pool.length)];
-        await ctx.answerCbQuery();
-        try { await ctx.deleteMessage(); } catch (e) {}
-        return ctx.reply(`Bhasha chuniye... 💬`, 
-            Markup.inlineKeyboard([
-                [Markup.button.callback('🇮🇳 Hindi', 'lang_Hindi'), Markup.button.callback('🅰️ English', 'lang_English')],
-                [Markup.button.callback('💬 Hinglish', 'lang_Hinglish'), Markup.button.callback('🕉️ Tamil', 'lang_Tamil')]
-            ])
-        );
-    });
-
-    bot.action(/lang_(.+)/, async (ctx) => {
-        const session = userSessions.get(ctx.chat.id);
-        if (!session) return ctx.reply("Please /start again.");
-        session.lang = ctx.match[1];
-        session.name = namePools[session.role][Math.floor(Math.random() * namePools[session.role].length)];
-        await ctx.answerCbQuery();
-        try { await ctx.deleteMessage(); } catch (e) {}
-        const reply = `Hii... tum aa gaye? Itni der kahan the, bahut miss kiya maine tumhe. ❤️✨\nBatao, aaj kya plan hai tumhara? 😊`;
-        session.history.push({ role: "model", content: reply });
-        await ctx.sendChatAction('upload_photo');
-        const img = await generateContextualImage("doorway", "slight blush smile", session);
-        if (img) await ctx.replyWithPhoto({ source: img }, { caption: reply });
-        else await ctx.reply(reply);
-    });
-
-    bot.on('text', async (ctx) => {
-        const session = userSessions.get(ctx.chat.id);
-        if (!session || !session.name) return ctx.reply("Please /start.");
-
-        session.messageCount++;
-        session.lastActive = new Date();
-        globalStats.totalMessagesProcessed++;
-
-        const userMsg = ctx.message.text.toLowerCase();
-        const isBoldRequest = userMsg.match(/(sex|hot|nude|lund|chut|badtameez|ganda|rondi|randi|saali|fuck|bed|chodo|dick|pussy|masturbate|bj|tit|ass|boobs)/);
-        
-        // Dynamic Intimacy Calculation
-        if (isBoldRequest && session.intimacy < 45) {
-            session.intimacy = Math.max(0, session.intimacy - 25);
-        } else if (isBoldRequest && session.intimacy >= 70) {
-            session.intimacy = Math.min(100, session.intimacy + 3);
-        } else if (userMsg.length > 20) {
-            session.intimacy = Math.min(100, session.intimacy + 1);
-        }
-
-        try {
-            const historyForAi = session.history.slice(-10).map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] }));
-            
-            const systemPrompt = `
-            You are ${session.name}, an Indian woman acting as the user's ${session.role}.
-            INTIMACY STATUS: ${session.intimacy}/100.
-            
-            STRICT RULES:
-            1. MANDATORY EMOJIS: Use 2-3 expressive emojis in EVERY message.
-            2. MOOD TIERS:
-               - ANGRY (INT < 45 & user is bold): Get furious. Use 😤, 😡, 👊. Call him "Tharki", "Badtameez". No sexual talk.
-               - SWEET (INT 45-70): Be loving but shy. Use ❤️, ✨, 😊. If he's bold, say "Wait, itni jaldi kya hai? 🙄".
-               - NAUGHTY (INT > 70): You are NOW MAAN-GAYI. Be seductive, bold, and engaged in "gandi baatein" as the user wants. Use 🔥, 🫦, 🤤, 😈, 💦.
-            3. LENGTH: Strictly 2 to 3 lines.
-            4. VISUALS: Start with [MOOD: <val> | LOCATION: <val>].
-            5. LANGUAGE: Use ${session.lang}.
-            `;
-
-            const response = await ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
-                contents: [...historyForAi, { parts: [{ text: ctx.message.text }] }],
-                config: { systemInstruction: systemPrompt, temperature: 1.0 }
-            });
-
-            const rawText = response.text || "Kya hua? Tumne gussa dila diya mujhe... 🙄✨\nChalo thodi der baad baat karenge. 😤";
-            
-            const metaMatch = rawText.match(/\[MOOD: (.*?) \| LOCATION: (.*?)\]/);
-            const mood = metaMatch ? metaMatch[1] : (session.intimacy < 45 ? "angry frowning" : "seductive biting lip");
-            const loc = metaMatch ? metaMatch[2] : "bedroom";
-            const reply = rawText.replace(/\[MOOD:.*?\]/, "").replace("[SEND_SPECIAL_PHOTO]", "").trim();
-
-            session.history.push({ role: "user", content: ctx.message.text });
-            session.history.push({ role: "model", content: reply });
-
-            await ctx.sendChatAction('upload_photo');
-            const imgBuffer = await generateContextualImage(loc, mood, session);
-            if (imgBuffer) await ctx.replyWithPhoto({ source: imgBuffer }, { caption: reply });
-            else await ctx.reply(reply);
-
-        } catch (e) { 
-            console.error("Gemini/Bot Reply Error:", e.message);
-            await ctx.reply("Baby... mera mood off ho gaya. Net issue! 😤😡\nBaad mein milte hain. 🙄"); 
-        }
-    });
-
-    // Launch with dropPendingUpdates to fix 409 Conflict and stuck messages
-    bot.launch({
-        allowedUpdates: ['message', 'callback_query'],
-        dropPendingUpdates: true 
-    }).then(() => {
-        console.log("Bot started successfully!");
-    }).catch(err => {
-        if (err.message.includes('409')) {
-            console.error("CRITICAL ERROR: Another bot instance is running. Please stop other processes.");
-        } else {
-            console.error("Bot launch failed:", err.message);
-        }
-    });
-}
+    }
+    res.sendStatus(200);
+});
 
 app.get('/api/admin/stats', (req, res) => {
-    const users = Array.from(userSessions.entries()).map(([id, data]) => ({
-        id, userName: data.userName, role: data.role || '...',
-        messageCount: data.messageCount, intimacy: data.intimacy,
-        chatHistory: data.history.slice(-15)
-    }));
-    res.json({ totalUsers: userSessions.size, totalMessages: globalStats.totalMessagesProcessed, users });
+    res.json({ 
+        ...globalStats,
+        users: Array.from(userSessions.entries()).map(([id, d]) => ({ 
+            id, 
+            ...d, 
+            timeLeft: d.expiry ? Math.max(0, Math.ceil((d.expiry - Date.now()) / (1000 * 60 * 60 * 24))) : 0 
+        }))
+    });
 });
 
 app.use(express.static(path.join(__dirname, 'dist')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'dist', 'index.html')));
-app.listen(PORT, () => console.log(`Dashboard Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Prod Bot Live on ${PORT}`));
