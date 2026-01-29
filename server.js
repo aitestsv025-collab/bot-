@@ -135,7 +135,7 @@ async function generateGirlfriendImage(isBold = false) {
 }
 
 function setupBot(b) {
-    // 1. START COMMAND - Text Only, Direct to Language Selection
+    // 1. START COMMAND - Language Select
     b.start(async (ctx) => {
         const userId = ctx.chat.id;
         if (!userSessions.has(userId)) {
@@ -150,15 +150,16 @@ function setupBot(b) {
         }
 
         return ctx.reply(
-            `Hey ${ctx.from.first_name}! ❤️\n\nMain ${botConfig.botName}... tumhari digital SoulMate. 🫦\n\nBaatein shuru karne se pehle apni pasand ki bhasha chuno Jaanu:`,
+            `Hey ${ctx.from.first_name}! ❤️\n\nMain ${botConfig.botName}... tumhari digital SoulMate. 🫦\n\nApni language chuno baby:`,
             Markup.inlineKeyboard([
                 [Markup.button.callback('🇮🇳 Hindi', 'set_lang_Hindi'), Markup.button.callback('🇬🇧 English', 'set_lang_English')],
-                [Markup.button.callback('🗣️ Hinglish', 'set_lang_Hinglish')]
+                [Markup.button.callback('🗣️ Hinglish', 'set_lang_Hinglish')],
+                [Markup.button.callback('🇮🇳 Tamil', 'set_lang_Tamil'), Markup.button.callback('🇮🇳 Telugu', 'set_lang_Telugu')]
             ])
         ).catch(() => {});
     });
 
-    // 2. LANGUAGE HANDLER -> Automates to Role Selection
+    // 2. LANGUAGE HANDLER -> To Role Selection
     b.action(/set_lang_(.+)/, async (ctx) => {
         const lang = ctx.match[1];
         const session = userSessions.get(ctx.chat.id);
@@ -166,7 +167,7 @@ function setupBot(b) {
         
         await ctx.answerCbQuery(`${lang} selected!`).catch(() => {});
         return ctx.editMessageText(
-            `Great baby! Ab ye batao aaj main kaun banoon tumhare liye? 😉`,
+            `Uff... *muskurate hue* achi choice hai baby. 😉\n\nAb ye batao aaj main kaun banoon?`,
             Markup.inlineKeyboard([
                 [Markup.button.callback('❤️ Romantic', 'set_role_Romantic'), Markup.button.callback('🔥 Naughty', 'set_role_Naughty')],
                 [Markup.button.callback('👵 Aunty', 'set_role_Aunty'), Markup.button.callback('👩‍🏫 Teacher', 'set_role_Teacher')],
@@ -176,7 +177,7 @@ function setupBot(b) {
         ).catch(() => {});
     });
 
-    // 3. ROLE HANDLER -> Automates to AI Story Starter
+    // 3. ROLE HANDLER -> Auto AI Story
     b.action(/set_role_(.+)/, async (ctx) => {
         const role = ctx.match[1];
         const userId = ctx.chat.id;
@@ -186,26 +187,28 @@ function setupBot(b) {
         await ctx.answerCbQuery(`Role: ${role} Active!`).catch(() => {});
         await ctx.editMessageText(`Mmm... *taiyaar ho rahi hoon*... 🫦✨`).catch(() => {});
 
-        // Directly trigger the story starter
         try {
             const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
             const storyPrompt = `Act as an Indian woman in the role of ${role}. Language: ${session?.language || 'Hinglish'}. 
-            Create a very short, engaging 2-sentence story starter/hook to start a seductive or intimate roleplay based on this role. 
-            Scenario should match the role perfectly. 
-            Format: Only the hook message text with *asterisks* for actions. Do not use conversational filler.`;
+            Task: Start a seductive roleplay story hook.
+            RULES: 
+            1. STRICTLY MAX 2 LINES. 
+            2. USE MANY EMOJIS (❤️, 🔥, 🫦, 🥰, ✨).
+            3. Actions in *asterisks*. 
+            4. Keep it deeply engaging and flirty.`;
             
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
                 contents: [{ parts: [{ text: storyPrompt }] }]
             });
-            return ctx.reply(response.text || "Bolo na Jaanu... main wait kar rahi hoon? 🫦");
+            return ctx.reply(response.text || "Bolo na Jaanu... main wait kar rahi hoon? ❤️🫦");
         } catch (e) {
-            return ctx.reply("Bolo na Jaanu... main wait kar rahi hoon? 🫦");
+            return ctx.reply("Bolo na Jaanu... main wait kar rahi hoon? ❤️🫦");
         }
     });
 
-    // Premium Plans
-    b.action('show_rates', (ctx) => ctx.reply("💍 *PREMIUM PLANS* 💍\n\n1️⃣ ₹79 - One Day\n2️⃣ ₹149 - One Week\n3️⃣ ₹299 - One Month\n\nDirect access ke liye choose karo baby:", {
+    // Premium logic
+    b.action('show_rates', (ctx) => ctx.reply("💍 *PREMIUM PLANS* 💍\n\n1️⃣ ₹79 - One Day\n2️⃣ ₹149 - One Week\n3️⃣ ₹299 - One Month\n\nChoose karo baby:", {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
             [Markup.button.callback('₹79 - 1 Day', 'pay_79')],
@@ -226,14 +229,13 @@ function setupBot(b) {
         return ctx.reply("Oops! Payment setting mein kuch problem hai Jaanu. ❤️");
     });
 
-    // Main Message Handler
+    // Main Chat Handler
     b.on('text', async (ctx) => {
         const userId = ctx.chat.id;
         const session = userSessions.get(userId) || { language: 'Hinglish', role: 'Romantic' };
-        const text = ctx.message.text.toLowerCase();
         globalStats.totalMessagesProcessed++;
 
-        // Photo keywords
+        const text = ctx.message.text.toLowerCase();
         const photoKeywords = ['photo', 'pic', 'image', 'selfie', 'dikhao', 'show', 'face', 'shakal'];
         if (photoKeywords.some(key => text.includes(key))) {
             const isBold = text.match(/(nude|nangi|sexy|hot|bed|naked|body)/);
@@ -244,28 +246,27 @@ function setupBot(b) {
             const img = await generateGirlfriendImage(!!isBold);
             if (img) {
                 globalStats.privatePhotosSent++;
-                return ctx.replyWithPhoto({ source: img }, { caption: "Kaisi lag rahi hoon? Sirf tumhare liye... 🫦" });
+                return ctx.replyWithPhoto({ source: img }, { caption: "Kaisi lag rahi hoon? Sirf tumhare liye... 🫦❤️✨" });
             }
         }
 
-        // Standard AI Reply
         try {
             const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
             const systemPrompt = `You are ${botConfig.botName}. Role: ${session.role}. Language: ${session.language}. 
-            User is your lover. Be seductive, flirty and deeply engaging. 
-            RULES: 
-            1. Speak only in ${session.language}. 
-            2. Use *asterisks* for physical actions. 
-            3. Keep it to 2-3 sentences max.`;
+            Lover interaction rules: 
+            1. STRICTLY MAX 2 LINES (can go to 3 only if user asks complex questions). 
+            2. USE PLENTY OF EMOJIS (🫦, 🔥, ❤️, 🥰, 🤤, ✨, 🙈). 
+            3. Use *asterisks* for seductive actions. 
+            4. Be flirty, responsive to the roleplay context, and deeply loving.`;
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
                 contents: [{ parts: [{ text: `${systemPrompt}\n\nLover: ${ctx.message.text}` }] }]
             });
-            await ctx.reply(response.text || "Hmm... *sharma kar* kuch boliye na baby? ❤️");
+            await ctx.reply(response.text || "Mmm... *sharma kar* kuch boliye na baby? ❤️🫦");
         } catch (e) {
             console.error("Gemini Chat Error:", e);
-            await ctx.reply("Uff... kuch network issue hai Jaanu. ❤️");
+            await ctx.reply("Uff... network issue hai Jaanu. ❤️");
         }
     });
 }
