@@ -20,7 +20,7 @@ const PORT = process.env.PORT || 10000;
 let botConfig = {
     secretGalleryUrl: "", 
     botName: "Malini",
-    isSandbox: false // Set to true for testing
+    isSandbox: false // Always Production now as per user request
 };
 
 const userSessions = new Map();
@@ -54,7 +54,7 @@ async function createCashfreePaymentLink(userId, amount, planName) {
             body: JSON.stringify({
                 customer_details: {
                     customer_id: userId.toString(),
-                    customer_phone: "9999999999", // Placeholder, Cashfree req
+                    customer_phone: "9999999999", 
                     customer_email: "customer@example.com"
                 },
                 link_id: orderId,
@@ -155,7 +155,6 @@ bot.action('show_rates', async (ctx) => {
     });
 });
 
-// Handle Dynamic Payment Generation
 const planHandlers = [
     { action: 'buy_79', amount: 79, name: 'Daily' },
     { action: 'buy_149', amount: 149, name: 'Weekly' },
@@ -186,9 +185,10 @@ bot.on('text', async (ctx) => {
     globalStats.totalMessagesProcessed++;
 
     const isAskingForLink = text.match(/(link|gallery|album|full|website|site|video|mms|collection|drive|telegram)/);
-    const isAskingForPhoto = text.match(/(photo|pic|image|dikhao|show|dekhna|selfie|capture)/);
+    const isAskingForPhoto = text.match(/(photo|pic|image|dikhao|show|dekhna|selfie|capture|shakal|chehra|body)/);
     const isNaughty = text.match(/(nude|nangi|sex|hot|bed|sexy|bra|panty|mms|naked|body|fuck|chodo|lund|pussy|dick)/);
 
+    // PRIORITY 1: GALLERY/LINK REQUEST
     if (isAskingForLink) {
         if (!isPremiumUser(userId)) {
             return ctx.reply("Uff... itni jaldi? 🙈 Mere saare private links dekhne ke liye tumhe mera Premium join karna padega, Jaanu. 🔥", 
@@ -202,6 +202,7 @@ bot.on('text', async (ctx) => {
         return ctx.reply(`Sirf tumhare liye... 🫦 Ye lo meri private gallery ka link:\n\n🔗 ${botConfig.secretGalleryUrl}\n\nKisi ko dikhana mat haan? 😉😈`);
     }
 
+    // PRIORITY 2: STRICT IMAGE REQUEST
     if (isAskingForPhoto) {
         if (isNaughty && !isPremiumUser(userId)) {
             return ctx.reply("Wait... akele mein aisi baatein? 🙈 Pehle premium toh le lo, fir jo bologe wo dikhaungi... 🫦", 
@@ -213,14 +214,17 @@ bot.on('text', async (ctx) => {
         if (imgBuffer) {
             globalStats.privatePhotosSent++;
             return ctx.replyWithPhoto({ source: imgBuffer }, { caption: isNaughty ? "Sirf tumhare liye... 😈 Kaisi lag rahi hoon?" : "Ye lo meri selfie! 🥰" });
+        } else {
+            return ctx.reply("Uff... camera thoda kharab hai baby, ruko main ek sweet sa reply deti hoon... ❤️");
         }
     }
 
+    // PRIORITY 3: NORMAL CHAT (No Image Gen)
     try {
         const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: [{ parts: [{ text: `System: Roleplay as Malini, a seductive Indian Girlfriend. Hinglish. User: ${ctx.message.text}` }] }]
+            contents: [{ parts: [{ text: `System: Roleplay as Malini, a seductive Indian Girlfriend. Hinglish. Never mention sending a photo unless the user explicitly asks. User: ${ctx.message.text}` }] }]
         });
         await ctx.reply(response.text);
     } catch (e) {
@@ -229,9 +233,8 @@ bot.on('text', async (ctx) => {
 });
 
 app.post('/api/admin/config', (req, res) => {
-    const { secretGalleryUrl, isSandbox } = req.body;
+    const { secretGalleryUrl } = req.body;
     if (typeof secretGalleryUrl === 'string') botConfig.secretGalleryUrl = secretGalleryUrl;
-    if (typeof isSandbox === 'boolean') botConfig.isSandbox = isSandbox;
     res.json({ success: true, config: botConfig });
 });
 
@@ -249,4 +252,4 @@ app.get('/api/admin/stats', (req, res) => {
 
 app.use(express.static(path.join(__dirname, 'dist')));
 if (BOT_TOKEN) bot.launch();
-app.listen(PORT, () => console.log(`Server on ${PORT} | Cashfree: ${CF_APP_ID ? 'Configured' : 'MISSING'}`));
+app.listen(PORT, () => console.log(`Server on ${PORT} | Mode: PRODUCTION`));
