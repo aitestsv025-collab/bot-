@@ -12,80 +12,161 @@ interface UserData {
 interface StatsData {
   totalUsers: number;
   totalRevenue: number;
+  totalMessagesProcessed: number;
   privatePhotosSent: number;
+  galleryAccessCount: number;
+  config: {
+    secretGalleryUrl: string;
+    botName: string;
+  };
   users: UserData[];
 }
 
 const StatsDashboard: React.FC = () => {
   const [stats, setStats] = useState<StatsData | null>(null);
+  const [newGalleryUrl, setNewGalleryUrl] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
-      const res = await fetch('/api/admin/stats');
-      if (res.ok) setStats(await res.json());
+      try {
+        const res = await fetch('/api/admin/stats');
+        if (res.ok) {
+          const data = await res.json();
+          setStats(data);
+          if (!newGalleryUrl) setNewGalleryUrl(data.config.secretGalleryUrl);
+        }
+      } catch (e) {
+        console.error("Failed to fetch stats");
+      }
     };
     fetchStats();
-    const interval = setInterval(fetchStats, 3000);
+    const interval = setInterval(fetchStats, 5000);
     return () => clearInterval(interval);
   }, []);
 
+  const handleUpdateConfig = async () => {
+    setIsSaving(true);
+    try {
+      await fetch('/api/admin/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secretGalleryUrl: newGalleryUrl })
+      });
+      alert("Settings Updated! Bot will now share the new link.");
+    } catch (e) {
+      alert("Update failed");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
-    <div className="p-6 space-y-6 bg-gray-50/50 min-h-screen">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-rose-100 flex flex-col items-center justify-center">
-          <p className="text-[10px] text-rose-500 font-black uppercase tracking-widest mb-2">Earnings</p>
-          <p className="text-4xl font-black text-gray-900">₹{stats?.totalRevenue || 0}</p>
+    <div className="p-6 space-y-8 bg-[#fffafa] min-h-screen">
+      {/* Real-time Ticker */}
+      <div className="bg-gray-900 text-white px-6 py-2 rounded-full text-[10px] font-bold tracking-widest uppercase flex items-center justify-between shadow-xl">
+        <div className="flex items-center gap-2">
+           <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+           SoulMate AI: Engine Version 3.1 Live
         </div>
-        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-rose-100 flex flex-col items-center justify-center">
-          <p className="text-[10px] text-orange-500 font-black uppercase tracking-widest mb-2">Photos Unlocked</p>
-          <p className="text-4xl font-black text-gray-900">{stats?.privatePhotosSent || 0}</p>
+        <div className="text-rose-400">Secure Payments via Cashfree API</div>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-rose-100">
+          <p className="text-[10px] text-rose-500 font-black uppercase tracking-widest mb-1">Total Revenue</p>
+          <div className="flex items-end gap-1">
+            <span className="text-3xl font-black text-gray-900">₹{stats?.totalRevenue || 0}</span>
+          </div>
         </div>
-        <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-rose-100 flex flex-col items-center justify-center">
-          <p className="text-[10px] text-blue-500 font-black uppercase tracking-widest mb-2">Live Connections</p>
-          <p className="text-4xl font-black text-gray-900">{stats?.totalUsers || 0}</p>
+        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-rose-100">
+          <p className="text-[10px] text-orange-500 font-black uppercase tracking-widest mb-1">AI Photos Sent</p>
+          <div className="flex items-end gap-1">
+            <span className="text-3xl font-black text-gray-900">{stats?.privatePhotosSent || 0}</span>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-rose-100">
+          <p className="text-[10px] text-blue-500 font-black uppercase tracking-widest mb-1">Gallery Unlocks</p>
+          <div className="flex items-end gap-1">
+            <span className="text-3xl font-black text-gray-900">{stats?.galleryAccessCount || 0}</span>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-rose-100">
+          <p className="text-[10px] text-purple-500 font-black uppercase tracking-widest mb-1">Total Souls</p>
+          <div className="flex items-end gap-1">
+            <span className="text-3xl font-black text-gray-900">{stats?.totalUsers || 0}</span>
+          </div>
         </div>
       </div>
 
+      {/* Configuration Panel */}
+      <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-rose-100">
+        <div className="flex items-center gap-4 mb-8">
+           <div className="w-12 h-12 bg-rose-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-rose-200">
+              <i className="fas fa-cog text-xl"></i>
+           </div>
+           <div>
+              <h3 className="font-bold text-2xl italic fancy-font">Bot Configuration</h3>
+              <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Manage Secret Links & Persona</p>
+           </div>
+        </div>
+
+        <div className="space-y-6">
+            <div className="space-y-2">
+                <label className="text-xs font-black text-gray-500 uppercase tracking-widest">Secret Gallery Link (Telegra.ph/ImgBB)</label>
+                <div className="flex gap-4">
+                    <input 
+                        type="text" 
+                        value={newGalleryUrl}
+                        onChange={(e) => setNewGalleryUrl(e.target.value)}
+                        placeholder="Paste your link here..."
+                        className="flex-1 bg-gray-50 border border-gray-100 px-6 py-4 rounded-2xl focus:ring-2 focus:ring-rose-500 outline-none text-sm font-medium"
+                    />
+                    <button 
+                        onClick={handleUpdateConfig}
+                        disabled={isSaving}
+                        className="bg-rose-500 text-white px-8 py-4 rounded-2xl font-bold text-sm shadow-lg shadow-rose-200 hover:bg-rose-600 transition-all disabled:opacity-50"
+                    >
+                        {isSaving ? 'Saving...' : 'SAVE LINK'}
+                    </button>
+                </div>
+                <p className="text-[10px] text-gray-400 italic">This link is only visible to premium users who ask for "gallery" or "full album".</p>
+            </div>
+        </div>
+      </div>
+
+      {/* Users Table */}
       <div className="bg-white rounded-[2.5rem] shadow-xl border border-rose-100 overflow-hidden">
-        <div className="p-8 border-b border-rose-50 flex justify-between items-center bg-rose-50/20">
-            <h3 className="font-bold text-gray-800 italic fancy-font text-2xl">Client Relationship Manager</h3>
-            <span className="px-4 py-1.5 bg-green-100 text-green-600 text-[10px] font-bold rounded-full animate-pulse">LIVE SYNC</span>
+        <div className="p-8 border-b border-rose-50 bg-gradient-to-r from-rose-50/50 to-white">
+            <h3 className="font-bold text-xl text-gray-800">Recent Users</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-gray-50/50">
-              <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                <th className="px-8 py-6">Identity</th>
-                <th className="px-8 py-6">Current Plan</th>
-                <th className="px-8 py-6">Validity Left</th>
+              <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-rose-50">
+                <th className="px-8 py-6">User</th>
+                <th className="px-8 py-6">Plan</th>
+                <th className="px-8 py-6">Days Left</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-rose-50">
               {stats?.users.map(user => (
-                <tr key={user.id} className="hover:bg-rose-50/30 transition-colors">
+                <tr key={user.id}>
                   <td className="px-8 py-6">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-500 font-bold">
-                            {user.userName[0]}
-                        </div>
-                        <span className="font-bold text-gray-700">{user.userName}</span>
+                      <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-500 font-bold text-xs">
+                        {user.userName[0]}
+                      </div>
+                      <span className="font-bold text-gray-800">{user.userName}</span>
                     </div>
                   </td>
                   <td className="px-8 py-6">
-                    <span className={`px-4 py-2 text-[10px] font-black rounded-xl uppercase tracking-wider ${user.isPremium ? 'bg-rose-500 text-white shadow-lg shadow-rose-200' : 'bg-gray-100 text-gray-400'}`}>
-                      {user.isPremium ? `💎 ${user.planName}` : 'Standard'}
+                    <span className={`px-3 py-1 text-[9px] font-black rounded-lg uppercase tracking-wider ${user.isPremium ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                      {user.isPremium ? user.planName : 'Free'}
                     </span>
                   </td>
-                  <td className="px-8 py-6">
-                    {user.isPremium ? (
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 bg-green-500 rounded-full animate-ping"></span>
-                            <span className="text-sm font-bold text-gray-600">{user.timeLeft} Days Left</span>
-                        </div>
-                    ) : (
-                        <span className="text-sm text-gray-300 italic">Expired / Inactive</span>
-                    )}
-                  </td>
+                  <td className="px-8 py-6 font-bold text-sm">{user.timeLeft}</td>
                 </tr>
               ))}
             </tbody>

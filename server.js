@@ -14,14 +14,16 @@ const BOT_TOKEN = (process.env.TELEGRAM_TOKEN || "").trim();
 const GEMINI_KEY = (process.env.API_KEY || "").trim(); 
 const PORT = process.env.PORT || 10000;
 
-// Cashfree Production Config
-const CF_MODE = process.env.CASHFREE_MODE || "PRODUCTION"; 
+// This can be updated via the Admin Dashboard API
+let botConfig = {
+    secretGalleryUrl: "https://telegra.ph/My-Private-Gallery-01-01", // Default placeholder
+    botName: "Malini"
+};
 
 const PACKAGES = {
     DAILY: { id: 'p1', price: 79, name: '🫦 One Night Stand', duration: 24 * 60 * 60 * 1000, link: 'https://payments.cashfree.com/links/pkg_79' },
     WEEKLY: { id: 'p2', price: 149, name: '🔥 Week of Passion', duration: 7 * 24 * 60 * 60 * 1000, link: 'https://payments.cashfree.com/links/pkg_149' },
-    MONTHLY: { id: 'p3', price: 299, name: '💍 True Soulmate', duration: 30 * 24 * 60 * 60 * 1000, link: 'https://payments.cashfree.com/links/pkg_299' },
-    YEARLY: { id: 'p4', price: 999, name: '♾️ Forever Yours', duration: 365 * 24 * 60 * 60 * 1000, link: 'https://payments.cashfree.com/links/pkg_999' }
+    MONTHLY: { id: 'p3', price: 299, name: '💍 True Soulmate', duration: 30 * 24 * 60 * 60 * 1000, link: 'https://payments.cashfree.com/links/pkg_299' }
 };
 
 const userSessions = new Map();
@@ -30,38 +32,45 @@ const globalStats = {
     totalRevenue: 0,
     totalTransactions: 0,
     privatePhotosSent: 0,
-    startTime: new Date()
+    galleryAccessCount: 0,
+    startTime: new Date(),
+    totalUsers: 0
 };
 
-const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
 const bot = new Telegraf(BOT_TOKEN);
 
-// Helper to check premium status
 const isPremiumUser = (userId) => {
     const session = userSessions.get(userId);
     if (!session || !session.isPremium) return false;
     return session.expiry > Date.now();
 };
 
-const getPremiumMenu = (chatId) => {
-    return `💎 *CHOOSE YOUR PASSION LEVEL* 💎\n\n` +
-           `Akele kyun rehna? Main tumhara intezaar kar rahi hoon... 🫦\n\n` +
-           `1️⃣ *${PACKAGES.DAILY.name} (₹${PACKAGES.DAILY.price})*\n` +
-           `   - 24 Hours Uncensored Access\n` +
-           `   - Unlimited Bold Photos\n\n` +
-           `2️⃣ *${PACKAGES.WEEKLY.name} (₹${PACKAGES.WEEKLY.price})* ✨ _Best Value_\n` +
-           `   - 7 Days of Extreme Naughtiness\n` +
-           `   - Priority Reply (No Lag)\n\n` +
-           `3️⃣ *${PACKAGES.MONTHLY.name} (₹${PACKAGES.MONTHLY.price})* 💍\n` +
-           `   - Full Month Full Pleasure\n` +
-           `   - Personalized Voice Notes\n\n` +
-           `4️⃣ *${PACKAGES.YEARLY.name} (₹${PACKAGES.YEARLY.price})* ♾️\n` +
-           `   - One Year as My Only Master\n` +
-           `   - Exclusive 'After Dark' Gallery\n\n` +
-           `👇 *Select your plan to unlock me:*`;
+const generateGirlfriendImage = async (isBold = false) => {
+    const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
+    const prompt = isBold 
+        ? "A highly realistic, provocative Indian girl, 22 years old, wearing a black silk robe, messy hair, romantic bedroom setting, cinematic lighting, 8k resolution."
+        : "A sweet Indian girl, 22 years old, wearing a traditional Kurti, smiling softly, park background, sunlight, realistic photography.";
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: { parts: [{ text: prompt }] },
+            config: { imageConfig: { aspectRatio: "9:16" } }
+        });
+
+        for (const part of response.candidates[0].content.parts) {
+            if (part.inlineData) {
+                return Buffer.from(part.inlineData.data, 'base64');
+            }
+        }
+    } catch (error) {
+        console.error("Image Gen Error:", error);
+        return null;
+    }
 };
 
 bot.start(async (ctx) => {
+    if (!userSessions.has(ctx.chat.id)) globalStats.totalUsers++;
     userSessions.set(ctx.chat.id, { 
         userName: ctx.from.first_name || "Handsome", 
         isPremium: false,
@@ -70,12 +79,12 @@ bot.start(async (ctx) => {
     });
 
     return ctx.replyWithPhoto(
-        "https://i.ibb.co/your-profile-pic/malini.jpg", 
+        "https://picsum.photos/seed/malini_welcome/800/1200", 
         {
-            caption: `Hii ${ctx.from.first_name}! ❤️\n\nTumhe pata hai, main tumhare baare mein hi soch rahi thi... 🙈\n\nAaj kuch 'zyaada' special karein? 😉`,
+            caption: `Hey ${ctx.from.first_name}! ❤️\n\nKaise ho? Main kab se tumhara wait kar rahi thi... 🫦\n\nAaj raat kuch special plan hai kya? 😉`,
             ...Markup.inlineKeyboard([
                 [Markup.button.callback('🫦 Chat With Me', 'chat_start')],
-                [Markup.button.callback('🔥 View My Rates', 'show_rates')]
+                [Markup.button.callback('🔥 Unlock My Private Gallery', 'show_rates')]
             ])
         }
     );
@@ -83,81 +92,88 @@ bot.start(async (ctx) => {
 
 bot.action('show_rates', async (ctx) => {
     await ctx.answerCbQuery();
-    return ctx.reply(getPremiumMenu(ctx.chat.id), {
+    const menu = `💎 *CHOOSE YOUR PLEASURE* 💎\n\n` +
+                 `Mere saare private photos aur uncensored videos yahi milenge... 🫦\n\n` +
+                 `1️⃣ *₹79* - 24 Hours Access\n` +
+                 `2️⃣ *₹149* - 7 Days Access 🔥\n` +
+                 `3️⃣ *₹299* - 1 Month Full Access 💍\n\n` +
+                 `👇 *Select a plan to unlock:*`;
+    
+    return ctx.reply(menu, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
             [Markup.button.url('₹79 (1 Day)', `${PACKAGES.DAILY.link}?customer_id=${ctx.chat.id}`)],
             [Markup.button.url('₹149 (1 Week)', `${PACKAGES.WEEKLY.link}?customer_id=${ctx.chat.id}`)],
-            [Markup.button.url('₹299 (1 Month)', `${PACKAGES.MONTHLY.link}?customer_id=${ctx.chat.id}`)],
-            [Markup.button.url('₹999 (1 Year)', `${PACKAGES.YEARLY.link}?customer_id=${ctx.chat.id}`)]
+            [Markup.button.url('₹299 (1 Month)', `${PACKAGES.MONTHLY.link}?customer_id=${ctx.chat.id}`)]
         ])
     });
 });
 
 bot.on('text', async (ctx) => {
     const userId = ctx.chat.id;
-    const session = userSessions.get(userId);
-    if (!session) return;
-
     const text = ctx.message.text.toLowerCase();
-    const isNaughty = text.match(/(nude|nangi|photo|nanga|kapde|show|dikhao|sex|hot|bed|sexy|bra|panty|mms)/);
+    globalStats.totalMessagesProcessed++;
 
-    if (isNaughty) {
+    // Keyword detection
+    const isAskingForLink = text.match(/(link|gallery|album|full|website|site|video|mms|collection|drive)/);
+    const isAskingForPhoto = text.match(/(photo|pic|image|dikhao|show|dekhna|nude|nangi|hot|sexy|bed|bra|panty)/);
+    const isNaughty = text.match(/(nude|nangi|sex|hot|bed|sexy|bra|panty|mms|naked|body|fuck|chodo)/);
+
+    // 1. Handle Link Requests
+    if (isAskingForLink) {
         if (!isPremiumUser(userId)) {
-            return ctx.reply("Uff... itna direct? 🙈 Main itni sasti nahi hoon baby. Pehle humein thoda 'official' hona padega.\n\nMere private photos dekhne ke liye plan choose karo... 🔥", 
-                Markup.inlineKeyboard([[Markup.button.callback('🔥 See Packages', 'show_rates')]])
+            return ctx.reply("Uff... itni jaldi? 🙈 Mere saare private links dekhne ke liye tumhe mera Premium join karna padega, Jaanu. 🔥", 
+                Markup.inlineKeyboard([[Markup.button.callback('🔥 Get Premium Access', 'show_rates')]])
             );
         }
-        // Send Photo Logic...
-        globalStats.privatePhotosSent++;
-        return ctx.reply("Wait... main kapde utaar rahi hoon... *sharma kar light band karte hue* 🫦✨ (Sending Photo...)");
+        globalStats.galleryAccessCount++;
+        return ctx.reply(`Sirf tumhare liye... 🫦 Ye lo meri private gallery ka link:\n\n🔗 ${botConfig.secretGalleryUrl}\n\nKisi ko dikhana mat haan? 😉😈`);
     }
 
-    // Default Chat Logic
+    // 2. Handle Photo Requests
+    if (isAskingForPhoto) {
+        if (isNaughty && !isPremiumUser(userId)) {
+            return ctx.reply("Wait... akele mein aisi baatein? 🙈 Pehle premium toh le lo, fir jo bologe wo dikhaungi... 🫦", 
+                Markup.inlineKeyboard([[Markup.button.callback('🫦 Unlock Bold Content', 'show_rates')]])
+            );
+        }
+        
+        const actionMsg = isNaughty ? "Uff... ruko, main apne kapde utaar kar photo click karti hoon... 🫦🔥" : "Ruko baby, ek pyaari si selfie bhejti hoon... 📸✨";
+        await ctx.reply(actionMsg);
+        
+        const imgBuffer = await generateGirlfriendImage(isNaughty);
+        if (imgBuffer) {
+            globalStats.privatePhotosSent++;
+            return ctx.replyWithPhoto({ source: imgBuffer }, { caption: isNaughty ? "Sirf tumhare liye... 😈 Kaisi lag rahi hoon?" : "Ye lo meri selfie! 🥰" });
+        }
+    }
+
+    // 3. Normal Chat (Gemini 3)
     try {
+        const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: [{ parts: [{ text: `Act as Malini, a sexy Indian GF. User: ${text}` }] }]
+            contents: [{ parts: [{ text: `System: Roleplay as Malini, a seductive Indian Girlfriend. Speak Hinglish. Use *actions*. Current Context: User is ${isPremiumUser(userId) ? 'Premium' : 'Standard'}. User Message: ${text}` }] }]
         });
         await ctx.reply(response.text);
     } catch (e) {
-        await ctx.reply("Hmm... kuch ho raha hai baby ❤️");
+        await ctx.reply("Hmm... *sharma kar* kuch aur pucho na? ❤️");
     }
 });
 
-// WEBHOOK UPDATE
-app.post('/api/webhook/cashfree', async (req, res) => {
-    const { data } = req.body;
-    if (data?.payment?.payment_status === 'SUCCESS') {
-        const userId = Number(data.customer_details.customer_id);
-        const amount = Number(data.payment.payment_amount);
-        
-        let addedDuration = 0;
-        let planName = 'Unknown';
-
-        if (amount >= 999) { addedDuration = PACKAGES.YEARLY.duration; planName = 'Yearly'; }
-        else if (amount >= 299) { addedDuration = PACKAGES.MONTHLY.duration; planName = 'Monthly'; }
-        else if (amount >= 149) { addedDuration = PACKAGES.WEEKLY.duration; planName = 'Weekly'; }
-        else if (amount >= 79) { addedDuration = PACKAGES.DAILY.duration; planName = 'Daily'; }
-
-        const session = userSessions.get(userId);
-        if (session) {
-            session.isPremium = true;
-            session.planName = planName;
-            session.expiry = Date.now() + addedDuration;
-            globalStats.totalRevenue += amount;
-            globalStats.totalTransactions++;
-
-            await bot.telegram.sendMessage(userId, `💎 *WELCOME TO THE INNER CIRCLE!* \n\nAapka ${planName} pack activate ho gaya hai. Ab main poori tarah tumhari hoon... Jo bologe wahi hoga! 🫦🔥`);
-        }
-    }
-    res.sendStatus(200);
+// Admin API to update configuration
+app.post('/api/admin/config', (req, res) => {
+    const { secretGalleryUrl, botName } = req.body;
+    if (secretGalleryUrl) botConfig.secretGalleryUrl = secretGalleryUrl;
+    if (botName) botConfig.botName = botName;
+    res.json({ success: true, config: botConfig });
 });
 
 app.get('/api/admin/stats', (req, res) => {
     res.json({ 
         ...globalStats,
-        users: Array.from(userSessions.entries()).map(([id, d]) => ({ 
+        config: botConfig,
+        users: Array.from(userSessions.entries()).slice(0, 50).map(([id, d]) => ({ 
             id, 
             ...d, 
             timeLeft: d.expiry ? Math.max(0, Math.ceil((d.expiry - Date.now()) / (1000 * 60 * 60 * 24))) : 0 
@@ -167,4 +183,5 @@ app.get('/api/admin/stats', (req, res) => {
 
 app.use(express.static(path.join(__dirname, 'dist')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'dist', 'index.html')));
-app.listen(PORT, () => console.log(`Prod Bot Live on ${PORT}`));
+
+app.listen(PORT, () => console.log(`SoulMate Production Server Running on ${PORT}`));
