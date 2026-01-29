@@ -9,12 +9,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(express.json());
 
-// ENV VARIABLES
+// ENV VARIABLES - Ensure these are set in your hosting provider (Render/Railway/etc)
 const BOT_TOKEN = (process.env.TELEGRAM_TOKEN || "").trim();
 const GEMINI_KEY = (process.env.API_KEY || "").trim(); 
 const PORT = process.env.PORT || 10000;
 
-// Default config starts empty so the user can paste their own
+if (!BOT_TOKEN) {
+    console.error("FATAL ERROR: TELEGRAM_TOKEN is not defined in environment variables!");
+}
+
+// Global Config
 let botConfig = {
     secretGalleryUrl: "", 
     botName: "Malini"
@@ -46,6 +50,7 @@ const isPremiumUser = (userId) => {
 };
 
 const generateGirlfriendImage = async (isBold = false) => {
+    if (!GEMINI_KEY) return null;
     const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
     const prompt = isBold 
         ? "A highly realistic, provocative Indian girl, 22 years old, wearing a black silk robe, messy hair, romantic bedroom setting, cinematic lighting, 8k resolution."
@@ -64,11 +69,12 @@ const generateGirlfriendImage = async (isBold = false) => {
             }
         }
     } catch (error) {
-        console.error("Image Gen Error:", error);
+        console.error("Image Generation Error:", error);
         return null;
     }
 };
 
+// Start Command
 bot.start(async (ctx) => {
     if (!userSessions.has(ctx.chat.id)) globalStats.totalUsers++;
     userSessions.set(ctx.chat.id, { 
@@ -77,6 +83,8 @@ bot.start(async (ctx) => {
         expiry: null,
         planName: 'None'
     });
+
+    console.log(`Bot started by user: ${ctx.from.first_name} (${ctx.chat.id})`);
 
     return ctx.replyWithPhoto(
         "https://picsum.photos/seed/malini_welcome/800/1200", 
@@ -90,6 +98,13 @@ bot.start(async (ctx) => {
     );
 });
 
+// Chat Start Action
+bot.action('chat_start', async (ctx) => {
+    await ctx.answerCbQuery();
+    return ctx.reply("Bolo na Jaanu... kya kar rahe ho abhi? 🫦 *sharma kar aanchal sanwaarte hue*");
+});
+
+// Show Rates Action
 bot.action('show_rates', async (ctx) => {
     await ctx.answerCbQuery();
     const menu = `💎 *CHOOSE YOUR PLEASURE* 💎\n\n` +
@@ -109,15 +124,15 @@ bot.action('show_rates', async (ctx) => {
     });
 });
 
+// Text Message Handler
 bot.on('text', async (ctx) => {
     const userId = ctx.chat.id;
     const text = ctx.message.text.toLowerCase();
     globalStats.totalMessagesProcessed++;
 
-    // Keyword detection
-    const isAskingForLink = text.match(/(link|gallery|album|full|website|site|video|mms|collection|drive)/);
-    const isAskingForPhoto = text.match(/(photo|pic|image|dikhao|show|dekhna|nude|nangi|hot|sexy|bed|bra|panty)/);
-    const isNaughty = text.match(/(nude|nangi|sex|hot|bed|sexy|bra|panty|mms|naked|body|fuck|chodo)/);
+    const isAskingForLink = text.match(/(link|gallery|album|full|website|site|video|mms|collection|drive|telegram)/);
+    const isAskingForPhoto = text.match(/(photo|pic|image|dikhao|show|dekhna|selfie|capture)/);
+    const isNaughty = text.match(/(nude|nangi|sex|hot|bed|sexy|bra|panty|mms|naked|body|fuck|chodo|lund|pussy|dick)/);
 
     // 1. Handle Link Requests
     if (isAskingForLink) {
@@ -148,19 +163,23 @@ bot.on('text', async (ctx) => {
         if (imgBuffer) {
             globalStats.privatePhotosSent++;
             return ctx.replyWithPhoto({ source: imgBuffer }, { caption: isNaughty ? "Sirf tumhare liye... 😈 Kaisi lag rahi hoon?" : "Ye lo meri selfie! 🥰" });
+        } else {
+            return ctx.reply("Mera camera thoda kharab ho gaya hai baby... ruko thodi der mein bhejti hoon! ❤️");
         }
     }
 
     // 3. Normal Chat (Gemini 3)
     try {
+        if (!GEMINI_KEY) throw new Error("GEMINI_KEY missing");
         const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: [{ parts: [{ text: `System: Roleplay as Malini, a seductive Indian Girlfriend. Speak Hinglish. Use *actions*. Current Context: User is ${isPremiumUser(userId) ? 'Premium' : 'Standard'}. User Message: ${text}` }] }]
+            contents: [{ parts: [{ text: `System: Roleplay as Malini, a seductive Indian Girlfriend. Speak naturally in Hinglish. Be playful and caring. User Context: ${isPremiumUser(userId) ? 'Premium User' : 'Standard User'}. Message: ${ctx.message.text}` }] }]
         });
         await ctx.reply(response.text);
     } catch (e) {
-        await ctx.reply("Hmm... *sharma kar* kuch aur pucho na? ❤️");
+        console.error("Gemini Error:", e);
+        await ctx.reply("Uff... main sharma gayi. Kuch aur pucho na? ❤️🫦");
     }
 });
 
@@ -187,4 +206,17 @@ app.get('/api/admin/stats', (req, res) => {
 app.use(express.static(path.join(__dirname, 'dist')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'dist', 'index.html')));
 
-app.listen(PORT, () => console.log(`SoulMate Production Server Running on ${PORT}`));
+// Launch Bot
+if (BOT_TOKEN) {
+    bot.launch()
+        .then(() => console.log("✅ Telegram Bot is running via Long Polling"))
+        .catch(err => console.error("❌ Failed to launch Telegram Bot:", err));
+} else {
+    console.warn("⚠️ Bot not launched: Missing TELEGRAM_TOKEN");
+}
+
+app.listen(PORT, () => console.log(`🚀 SoulMate Admin Dashboard running on http://localhost:${PORT}`));
+
+// Graceful stop
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
