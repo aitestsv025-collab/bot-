@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
 interface UserData {
   id: number;
@@ -26,6 +26,7 @@ const StatsDashboard: React.FC = () => {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [newGalleryUrl, setNewGalleryUrl] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const hasLoadedInitialValue = useRef(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -34,7 +35,13 @@ const StatsDashboard: React.FC = () => {
         if (res.ok) {
           const data = await res.json();
           setStats(data);
-          if (!newGalleryUrl) setNewGalleryUrl(data.config.secretGalleryUrl);
+          
+          // Only set the input field value if it's the FIRST time we load data
+          // This prevents polling from overwriting the user while they are typing
+          if (!hasLoadedInitialValue.current) {
+            setNewGalleryUrl(data.config.secretGalleryUrl || '');
+            hasLoadedInitialValue.current = true;
+          }
         }
       } catch (e) {
         console.error("Failed to fetch stats");
@@ -48,17 +55,25 @@ const StatsDashboard: React.FC = () => {
   const handleUpdateConfig = async () => {
     setIsSaving(true);
     try {
-      await fetch('/api/admin/config', {
+      const res = await fetch('/api/admin/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ secretGalleryUrl: newGalleryUrl })
       });
-      alert("Settings Updated! Bot will now share the new link.");
+      if (res.ok) {
+        alert("Settings Updated! Bot will now share the new link.");
+      } else {
+        throw new Error("Failed to update");
+      }
     } catch (e) {
-      alert("Update failed");
+      alert("Update failed. Please try again.");
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleClear = () => {
+    setNewGalleryUrl('');
   };
 
   return (
@@ -114,13 +129,21 @@ const StatsDashboard: React.FC = () => {
 
         <div className="space-y-6">
             <div className="space-y-2">
-                <label className="text-xs font-black text-gray-500 uppercase tracking-widest">Secret Gallery Link (Telegra.ph/ImgBB)</label>
+                <div className="flex justify-between items-center">
+                    <label className="text-xs font-black text-gray-500 uppercase tracking-widest">Secret Gallery Link (Telegra.ph/ImgBB)</label>
+                    <button 
+                        onClick={handleClear}
+                        className="text-[10px] font-bold text-rose-400 hover:text-rose-600 uppercase tracking-tighter"
+                    >
+                        [ Clear Current Link ]
+                    </button>
+                </div>
                 <div className="flex gap-4">
                     <input 
                         type="text" 
                         value={newGalleryUrl}
                         onChange={(e) => setNewGalleryUrl(e.target.value)}
-                        placeholder="Paste your link here..."
+                        placeholder="Paste your link here (e.g. https://telegra.ph/xyz)..."
                         className="flex-1 bg-gray-50 border border-gray-100 px-6 py-4 rounded-2xl focus:ring-2 focus:ring-rose-500 outline-none text-sm font-medium"
                     />
                     <button 
@@ -131,7 +154,7 @@ const StatsDashboard: React.FC = () => {
                         {isSaving ? 'Saving...' : 'SAVE LINK'}
                     </button>
                 </div>
-                <p className="text-[10px] text-gray-400 italic">This link is only visible to premium users who ask for "gallery" or "full album".</p>
+                <p className="text-[10px] text-gray-400 italic">This link is shared ONLY with Premium users who ask for your "gallery" or "album".</p>
             </div>
         </div>
       </div>
@@ -151,24 +174,28 @@ const StatsDashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-rose-50">
-              {stats?.users.map(user => (
-                <tr key={user.id}>
-                  <td className="px-8 py-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-500 font-bold text-xs">
-                        {user.userName[0]}
+              {(!stats?.users || stats.users.length === 0) ? (
+                <tr><td colSpan={3} className="px-8 py-6 text-center text-gray-400">No users found.</td></tr>
+              ) : (
+                stats.users.map(user => (
+                  <tr key={user.id}>
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-500 font-bold text-xs">
+                          {user.userName ? user.userName[0] : '?'}
+                        </div>
+                        <span className="font-bold text-gray-800">{user.userName || 'Unknown'}</span>
                       </div>
-                      <span className="font-bold text-gray-800">{user.userName}</span>
-                    </div>
-                  </td>
-                  <td className="px-8 py-6">
-                    <span className={`px-3 py-1 text-[9px] font-black rounded-lg uppercase tracking-wider ${user.isPremium ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                      {user.isPremium ? user.planName : 'Free'}
-                    </span>
-                  </td>
-                  <td className="px-8 py-6 font-bold text-sm">{user.timeLeft}</td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-8 py-6">
+                      <span className={`px-3 py-1 text-[9px] font-black rounded-lg uppercase tracking-wider ${user.isPremium ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                        {user.isPremium ? user.planName : 'Free'}
+                      </span>
+                    </td>
+                    <td className="px-8 py-6 font-bold text-sm">{user.timeLeft}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

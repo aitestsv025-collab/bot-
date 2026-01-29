@@ -14,9 +14,9 @@ const BOT_TOKEN = (process.env.TELEGRAM_TOKEN || "").trim();
 const GEMINI_KEY = (process.env.API_KEY || "").trim(); 
 const PORT = process.env.PORT || 10000;
 
-// This can be updated via the Admin Dashboard API
+// Default config starts empty so the user can paste their own
 let botConfig = {
-    secretGalleryUrl: "https://telegra.ph/My-Private-Gallery-01-01", // Default placeholder
+    secretGalleryUrl: "", 
     botName: "Malini"
 };
 
@@ -126,6 +126,9 @@ bot.on('text', async (ctx) => {
                 Markup.inlineKeyboard([[Markup.button.callback('🔥 Get Premium Access', 'show_rates')]])
             );
         }
+        if (!botConfig.secretGalleryUrl) {
+            return ctx.reply("Uff... abhi meri gallery tayyar nahi hai baby. Thodi der baad pucho? ❤️");
+        }
         globalStats.galleryAccessCount++;
         return ctx.reply(`Sirf tumhare liye... 🫦 Ye lo meri private gallery ka link:\n\n🔗 ${botConfig.secretGalleryUrl}\n\nKisi ko dikhana mat haan? 😉😈`);
     }
@@ -164,8 +167,8 @@ bot.on('text', async (ctx) => {
 // Admin API to update configuration
 app.post('/api/admin/config', (req, res) => {
     const { secretGalleryUrl, botName } = req.body;
-    if (secretGalleryUrl) botConfig.secretGalleryUrl = secretGalleryUrl;
-    if (botName) botConfig.botName = botName;
+    if (typeof secretGalleryUrl === 'string') botConfig.secretGalleryUrl = secretGalleryUrl;
+    if (typeof botName === 'string') botConfig.botName = botName;
     res.json({ success: true, config: botConfig });
 });
 
