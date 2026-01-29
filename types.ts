@@ -24,7 +24,7 @@ export interface BotConfig {
   apiProvider: ApiProvider;
   modelId: string;
   mood: 'Romantic' | 'Funny' | 'Supportive' | 'Playful' | 'Naughty';
-  language: 'Hindi' | 'English' | 'Hinglish' | 'Tamil';
+  language: 'Hindi' | 'English' | 'Hinglish' | 'Tamil' | 'Telugu';
 }
 
 export const DEFAULT_CONFIG: BotConfig = {
@@ -38,5 +38,5 @@ export const DEFAULT_CONFIG: BotConfig = {
   apiProvider: 'Gemini',
   modelId: "gemini-3-flash-preview",
   mood: "Romantic",
-  language: "English"
+  language: "Hinglish"
 };

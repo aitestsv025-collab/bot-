@@ -7,9 +7,10 @@ interface ChatUIProps {
   onSendMessage: (text: string) => void;
   isTyping: boolean;
   botName: string;
+  isPremium?: boolean;
 }
 
-const ChatUI: React.FC<ChatUIProps> = ({ messages, onSendMessage, isTyping, botName }) => {
+const ChatUI: React.FC<ChatUIProps> = ({ messages, onSendMessage, isTyping, botName, isPremium = false }) => {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -30,26 +31,37 @@ const ChatUI: React.FC<ChatUIProps> = ({ messages, onSendMessage, isTyping, botN
   return (
     <div className="flex flex-col h-full bg-white lg:rounded-3xl shadow-xl border border-rose-100 overflow-hidden">
       {/* Header */}
-      <div className="bg-rose-500 p-4 flex items-center gap-4">
-        <div className="relative">
-          <img
-            src={`https://picsum.photos/seed/${botName}/100`}
-            className="w-12 h-12 rounded-full border-2 border-white shadow-md"
-            alt="GF Avatar"
-          />
-          <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 border-2 border-white rounded-full"></span>
+      <div className="bg-rose-500 p-4 flex flex-col gap-2 shadow-lg">
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <img
+              src={`https://picsum.photos/seed/${botName}/100`}
+              className="w-12 h-12 rounded-full border-2 border-white shadow-md"
+              alt="GF Avatar"
+            />
+            <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 border-2 border-white rounded-full"></span>
+          </div>
+          <div className="flex-1">
+            <h2 className="text-white font-bold text-lg leading-tight">{botName}</h2>
+            <p className="text-rose-100 text-xs flex items-center gap-1">
+              <span className="animate-pulse">●</span> Online
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button className="text-white/80 hover:text-white transition-colors"><i className="fas fa-phone"></i></button>
+            <button className="text-white/80 hover:text-white transition-colors"><i className="fas fa-video"></i></button>
+          </div>
         </div>
-        <div>
-          <h2 className="text-white font-bold text-lg leading-tight">{botName}</h2>
-          <p className="text-rose-100 text-xs flex items-center gap-1">
-            <span className="animate-pulse">●</span> Online
-          </p>
-        </div>
-        <div className="ml-auto flex gap-3">
-          <button className="text-white/80 hover:text-white transition-colors"><i className="fas fa-phone"></i></button>
-          <button className="text-white/80 hover:text-white transition-colors"><i className="fas fa-video"></i></button>
-          <button className="text-white/80 hover:text-white transition-colors"><i className="fas fa-ellipsis-v"></i></button>
-        </div>
+
+        {/* Premium Button at the Top as requested */}
+        {!isPremium && (
+          <button 
+            onClick={() => alert("Redirecting to Plans... 🫦")}
+            className="w-full bg-yellow-400 hover:bg-yellow-500 text-rose-900 text-[10px] font-black uppercase tracking-widest py-1.5 rounded-lg shadow-inner flex items-center justify-center gap-2 transition-all active:scale-95"
+          >
+            <i className="fas fa-crown"></i> Unlock Premium (NSFW + Unlimited) <i className="fas fa-crown"></i>
+          </button>
+        )}
       </div>
 
       {/* Messages */}

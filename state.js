@@ -10,6 +10,15 @@ export const globalStats = {
     totalUsers: 0
 };
 
+const NAMES = [
+    "Riya", "Priya", "Sneha", "Ishani", "Kavya", "Ananya", "Sonia", "Meera", 
+    "Tanya", "Nisha", "Simran", "Ayesha", "Zoya", "Kiara", "Shanaya"
+];
+
+export function getRandomName() {
+    return NAMES[Math.floor(Math.random() * NAMES.length)];
+}
+
 export function isPremiumUser(userId) {
     const session = userSessions.get(userId);
     return session && session.isPremium && (session.expiry > Date.now());

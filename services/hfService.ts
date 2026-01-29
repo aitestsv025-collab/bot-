@@ -29,6 +29,8 @@ export class AiChatService {
         switch(this.config.language) {
           case 'Tamil': 
             langContext = "Respond in Tamil script." + emojiRule; break;
+          case 'Telugu': 
+            langContext = "Respond in Telugu script." + emojiRule; break;
           case 'Hindi': 
             langContext = "Respond in Hindi Devanagari." + emojiRule; break;
           case 'Hinglish': 
