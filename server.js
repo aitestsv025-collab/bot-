@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(express.json());
 
-// ENV VARIABLES - Ensuring they are strings
+// ENV VARIABLES
 const BOT_TOKEN = (process.env.TELEGRAM_TOKEN || "").trim();
 const GEMINI_KEY = (process.env.API_KEY || "").trim(); 
 const CF_APP_ID = (process.env.CASHFREE_APP_ID || "").trim();
@@ -27,7 +27,7 @@ const globalStats = {
     totalUsers: 0
 };
 
-// Bot Config (Dynamic)
+// Bot Config
 let botConfig = {
     welcomeImageUrl: "https://picsum.photos/seed/soulmate_welcome/800/1200",
     botName: "Malini"
@@ -102,8 +102,6 @@ if (BOT_TOKEN) {
     } catch (e) {
         console.error("Telegraf Init Error:", e.message);
     }
-} else {
-    console.warn("⚠️ TELEGRAM_TOKEN not found! Bot functionality disabled.");
 }
 
 function isPremiumUser(userId) {
@@ -137,6 +135,7 @@ async function generateGirlfriendImage(isBold = false) {
 }
 
 function setupBot(b) {
+    // 1. START COMMAND - Text Only, Direct to Language Selection
     b.start(async (ctx) => {
         const userId = ctx.chat.id;
         if (!userSessions.has(userId)) {
@@ -150,62 +149,50 @@ function setupBot(b) {
             });
         }
 
-        return ctx.replyWithPhoto(
-            botConfig.welcomeImageUrl, 
-            {
-                caption: `Hey ${ctx.from.first_name}! ❤️\n\nMain ${botConfig.botName}... tumhari digital SoulMate. 🫦\n\nBaatein shuru karne se pehle setting kar lo Jaanu:`,
-                ...Markup.inlineKeyboard([
-                    [Markup.button.callback('🌐 Set Language', 'menu_lang')],
-                    [Markup.button.callback('🎭 Choose Role', 'menu_role')],
-                    [Markup.button.callback('🫦 Start Chatting', 'chat_start')],
-                    [Markup.button.callback('🔥 Join Premium', 'show_rates')]
-                ])
-            }
-        ).catch(() => ctx.reply("Hey baby! Setting kar lo..."));
+        return ctx.reply(
+            `Hey ${ctx.from.first_name}! ❤️\n\nMain ${botConfig.botName}... tumhari digital SoulMate. 🫦\n\nBaatein shuru karne se pehle apni pasand ki bhasha chuno Jaanu:`,
+            Markup.inlineKeyboard([
+                [Markup.button.callback('🇮🇳 Hindi', 'set_lang_Hindi'), Markup.button.callback('🇬🇧 English', 'set_lang_English')],
+                [Markup.button.callback('🗣️ Hinglish', 'set_lang_Hinglish')]
+            ])
+        ).catch(() => {});
     });
 
-    b.action('menu_lang', (ctx) => ctx.editMessageCaption("Select your language baby: 🫦", Markup.inlineKeyboard([
-        [Markup.button.callback('🇮🇳 Hindi', 'set_lang_Hindi'), Markup.button.callback('🇬🇧 English', 'set_lang_English')],
-        [Markup.button.callback('🇮🇳 Tamil', 'set_lang_Tamil'), Markup.button.callback('🇮🇳 Telugu', 'set_lang_Telugu')],
-        [Markup.button.callback('🗣️ Hinglish', 'set_lang_Hinglish')],
-        [Markup.button.callback('⬅️ Back', 'back_start')]
-    ])).catch(() => {}));
-
-    b.action('menu_role', (ctx) => ctx.editMessageCaption("Main kaun banoon aaj? 😉", Markup.inlineKeyboard([
-        [Markup.button.callback('❤️ Romantic', 'set_role_Romantic'), Markup.button.callback('🔥 Naughty', 'set_role_Naughty')],
-        [Markup.button.callback('👵 Aunty', 'set_role_Aunty'), Markup.button.callback('👩‍🏫 Teacher', 'set_role_Teacher')],
-        [Markup.button.callback('👗 Stepmom', 'set_role_Stepmom'), Markup.button.callback('👧 Stepsister', 'set_role_Stepsister')],
-        [Markup.button.callback('💼 Boss', 'set_role_Boss'), Markup.button.callback('🏡 Neighbor', 'set_role_Neighbor')],
-        [Markup.button.callback('⬅️ Back', 'back_start')]
-    ])).catch(() => {}));
-
-    b.action(/set_(lang|role)_(.+)/, async (ctx) => {
-        const [, type, value] = ctx.match;
+    // 2. LANGUAGE HANDLER -> Automates to Role Selection
+    b.action(/set_lang_(.+)/, async (ctx) => {
+        const lang = ctx.match[1];
         const session = userSessions.get(ctx.chat.id);
-        if (session) session[type === 'lang' ? 'language' : 'role'] = value;
-        await ctx.answerCbQuery(`${value} selected!`).catch(() => {});
-        return ctx.reply(`Done baby! Ab main ${value} bankar tumse connect rahungi... 🫦`);
+        if (session) session.language = lang;
+        
+        await ctx.answerCbQuery(`${lang} selected!`).catch(() => {});
+        return ctx.editMessageText(
+            `Great baby! Ab ye batao aaj main kaun banoon tumhare liye? 😉`,
+            Markup.inlineKeyboard([
+                [Markup.button.callback('❤️ Romantic', 'set_role_Romantic'), Markup.button.callback('🔥 Naughty', 'set_role_Naughty')],
+                [Markup.button.callback('👵 Aunty', 'set_role_Aunty'), Markup.button.callback('👩‍🏫 Teacher', 'set_role_Teacher')],
+                [Markup.button.callback('👗 Stepmom', 'set_role_Stepmom'), Markup.button.callback('👧 Stepsister', 'set_role_Stepsister')],
+                [Markup.button.callback('💼 Boss', 'set_role_Boss'), Markup.button.callback('🏡 Neighbor', 'set_role_Neighbor')]
+            ])
+        ).catch(() => {});
     });
 
-    b.action('back_start', (ctx) => ctx.editMessageCaption("Settings update kar lo baby... 😉", Markup.inlineKeyboard([
-        [Markup.button.callback('🌐 Set Language', 'menu_lang')],
-        [Markup.button.callback('🎭 Choose Role', 'menu_role')],
-        [Markup.button.callback('🫦 Start Chatting', 'chat_start')],
-        [Markup.button.callback('🔥 Join Premium', 'show_rates')]
-    ])).catch(() => {}));
+    // 3. ROLE HANDLER -> Automates to AI Story Starter
+    b.action(/set_role_(.+)/, async (ctx) => {
+        const role = ctx.match[1];
+        const userId = ctx.chat.id;
+        const session = userSessions.get(userId);
+        if (session) session.role = role;
 
-    b.action('chat_start', async (ctx) => {
-        const session = userSessions.get(ctx.chat.id);
-        const role = session?.role || 'Romantic';
-        const lang = session?.language || 'Hinglish';
-        
-        await ctx.reply("Ruko baby, main taiyar ho rahi hoon... 🫦✨");
-        
+        await ctx.answerCbQuery(`Role: ${role} Active!`).catch(() => {});
+        await ctx.editMessageText(`Mmm... *taiyaar ho rahi hoon*... 🫦✨`).catch(() => {});
+
+        // Directly trigger the story starter
         try {
             const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
-            const storyPrompt = `Act as an Indian woman in the role of ${role}. Language: ${lang}. 
-            Create a very short, engaging 2-sentence story starter/hook to start a spicy or intimate roleplay. 
-            Scenario should match the role. Format: Just the hook message with *asterisks* for actions. No meta.`;
+            const storyPrompt = `Act as an Indian woman in the role of ${role}. Language: ${session?.language || 'Hinglish'}. 
+            Create a very short, engaging 2-sentence story starter/hook to start a seductive or intimate roleplay based on this role. 
+            Scenario should match the role perfectly. 
+            Format: Only the hook message text with *asterisks* for actions. Do not use conversational filler.`;
             
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
@@ -217,6 +204,7 @@ function setupBot(b) {
         }
     });
 
+    // Premium Plans
     b.action('show_rates', (ctx) => ctx.reply("💍 *PREMIUM PLANS* 💍\n\n1️⃣ ₹79 - One Day\n2️⃣ ₹149 - One Week\n3️⃣ ₹299 - One Month\n\nDirect access ke liye choose karo baby:", {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
@@ -238,12 +226,14 @@ function setupBot(b) {
         return ctx.reply("Oops! Payment setting mein kuch problem hai Jaanu. ❤️");
     });
 
+    // Main Message Handler
     b.on('text', async (ctx) => {
         const userId = ctx.chat.id;
         const session = userSessions.get(userId) || { language: 'Hinglish', role: 'Romantic' };
         const text = ctx.message.text.toLowerCase();
         globalStats.totalMessagesProcessed++;
 
+        // Photo keywords
         const photoKeywords = ['photo', 'pic', 'image', 'selfie', 'dikhao', 'show', 'face', 'shakal'];
         if (photoKeywords.some(key => text.includes(key))) {
             const isBold = text.match(/(nude|nangi|sexy|hot|bed|naked|body)/);
@@ -258,6 +248,7 @@ function setupBot(b) {
             }
         }
 
+        // Standard AI Reply
         try {
             const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
             const systemPrompt = `You are ${botConfig.botName}. Role: ${session.role}. Language: ${session.language}. 
@@ -294,13 +285,11 @@ app.post('/api/admin/config', (req, res) => {
     res.json({ success: true, config: botConfig });
 });
 
-// Serve Frontend
 app.use(express.static(path.join(__dirname, 'dist')));
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-// Start Express first, then Bot
 app.listen(PORT, () => {
     console.log(`🚀 SoulMate Engine Active on Port ${PORT}`);
     if (bot) {
