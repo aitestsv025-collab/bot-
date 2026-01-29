@@ -1,12 +1,12 @@
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface UserData {
   id: number;
   userName: string;
   isPremium: boolean;
-  planName: string;
-  timeLeft: number;
+  language: string;
+  role: string;
 }
 
 interface StatsData {
@@ -14,20 +14,15 @@ interface StatsData {
   totalRevenue: number;
   totalMessagesProcessed: number;
   privatePhotosSent: number;
-  galleryAccessCount: number;
-  cashfreeConfigured: boolean;
-  config: {
-    secretGalleryUrl: string;
-    botName: string;
-  };
+  config: { welcomeImageUrl: string; botName: string };
   users: UserData[];
 }
 
 const StatsDashboard: React.FC = () => {
   const [stats, setStats] = useState<StatsData | null>(null);
-  const [newGalleryUrl, setNewGalleryUrl] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [botName, setBotName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const hasLoadedInitialValue = useRef(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -36,162 +31,157 @@ const StatsDashboard: React.FC = () => {
         if (res.ok) {
           const data = await res.json();
           setStats(data);
-          
-          if (!hasLoadedInitialValue.current) {
-            setNewGalleryUrl(data.config.secretGalleryUrl || '');
-            hasLoadedInitialValue.current = true;
-          }
+          if (!imageUrl && data.config) setImageUrl(data.config.welcomeImageUrl);
+          if (!botName && data.config) setBotName(data.config.botName);
         }
       } catch (e) {
-        console.error("Failed to fetch stats");
+        console.error("Failed to fetch stats", e);
       }
     };
     fetchStats();
-    const interval = setInterval(fetchStats, 5000);
-    return () => clearInterval(interval);
+    const timer = setInterval(fetchStats, 5000);
+    return () => clearInterval(timer);
   }, []);
 
-  const handleUpdateConfig = async () => {
+  const handleSaveConfig = async () => {
     setIsSaving(true);
     try {
       const res = await fetch('/api/admin/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-            secretGalleryUrl: newGalleryUrl
-        })
+        body: JSON.stringify({ welcomeImageUrl: imageUrl, botName })
       });
       if (res.ok) {
-        alert("Bot Settings Updated! Secret gallery is now live for premium users.");
+        alert("Bot Config Updated! Naya image ab bot par dikhega. 🫦");
       }
     } catch (e) {
-      alert("Update failed.");
+      alert("Error updating config");
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <div className="p-6 space-y-8 bg-[#fffafa] min-h-screen pb-20">
-      {/* Status Bar */}
-      <div className="bg-gray-900 text-white px-6 py-3 rounded-full text-[11px] font-bold uppercase flex items-center justify-between shadow-2xl">
-        <div className="flex items-center gap-2">
-           <span className={`w-2 h-2 rounded-full animate-pulse ${stats?.cashfreeConfigured ? 'bg-green-400' : 'bg-red-500'}`}></span>
-           {stats?.cashfreeConfigured ? 'Cashfree API: Production Active' : 'Cashfree API: Configuration Missing'}
+    <div className="p-6 space-y-8 bg-[#fffafa] min-h-screen">
+      {/* Header */}
+      <div className="flex items-center justify-between bg-gray-900 text-white p-6 rounded-[2.5rem] shadow-2xl">
+        <div>
+          <h2 className="font-black italic text-rose-400 text-2xl tracking-tight fancy-font">SoulMate Live Monitor</h2>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Real-time Bot Performance</p>
         </div>
-        <div className="text-rose-400">Malini AI Core Operating Normal</div>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-rose-100 flex flex-col justify-center">
-          <p className="text-[10px] text-rose-500 font-black uppercase tracking-widest mb-1">Total Revenue</p>
-          <span className="text-3xl font-black text-gray-900">₹{stats?.totalRevenue || 0}</span>
-        </div>
-        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-rose-100 flex flex-col justify-center">
-          <p className="text-[10px] text-orange-500 font-black uppercase tracking-widest mb-1">AI Photos Request</p>
-          <span className="text-3xl font-black text-gray-900">{stats?.privatePhotosSent || 0}</span>
-        </div>
-        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-rose-100 flex flex-col justify-center">
-          <p className="text-[10px] text-blue-500 font-black uppercase tracking-widest mb-1">Gallery Access</p>
-          <span className="text-3xl font-black text-gray-900">{stats?.galleryAccessCount || 0}</span>
-        </div>
-        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-rose-100 flex flex-col justify-center">
-          <p className="text-[10px] text-purple-500 font-black uppercase tracking-widest mb-1">Total Users</p>
-          <span className="text-3xl font-black text-gray-900">{stats?.totalUsers || 0}</span>
+        <div className="flex items-center gap-3">
+          <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.6)]"></span>
+          <span className="text-xs font-black uppercase text-gray-300">System Online</span>
         </div>
       </div>
 
-      {/* Main Configuration Card */}
-      <div className="bg-white p-8 md:p-12 rounded-[3rem] shadow-2xl border border-rose-100">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-            <div className="flex items-center gap-5">
-                <div className="w-16 h-16 bg-gradient-to-br from-rose-500 to-rose-600 rounded-[1.5rem] flex items-center justify-center text-white shadow-xl shadow-rose-200">
-                    <i className="fas fa-magic text-2xl"></i>
-                </div>
-                <div>
-                    <h3 className="text-3xl font-black text-gray-900 fancy-font italic">SoulMate Studio</h3>
-                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Global Personality & API Control</p>
-                </div>
-            </div>
-            
-            <div className="flex items-center gap-2 bg-gray-50 px-5 py-2.5 rounded-2xl border border-gray-100">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Production Mode Engaged</span>
-            </div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-rose-50 transition-all hover:shadow-md">
+          <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-2">Total Earnings</p>
+          <p className="text-4xl font-black text-gray-900">₹{stats?.totalRevenue || 0}</p>
+          <div className="mt-4 h-1 w-12 bg-rose-500 rounded-full"></div>
         </div>
-
-        <div className="space-y-10">
-            <div className="space-y-4">
-                <div className="flex justify-between items-center px-2">
-                    <label className="text-[11px] font-black text-gray-500 uppercase tracking-[0.2em]">Secret Private Gallery URL</label>
-                    <span className="text-[10px] text-rose-400 italic font-medium">Shared strictly with Premium lovers</span>
-                </div>
-                <input 
-                    type="text" 
-                    value={newGalleryUrl}
-                    onChange={(e) => setNewGalleryUrl(e.target.value)}
-                    placeholder="https://telegra.ph/my-private-photos-xyz"
-                    className="w-full bg-gray-50 border border-gray-100 px-8 py-5 rounded-[1.5rem] text-sm font-semibold focus:ring-4 focus:ring-rose-500/10 focus:border-rose-300 outline-none transition-all placeholder:text-gray-300"
-                />
-            </div>
-
-            <div className="bg-rose-50/50 p-6 rounded-[2rem] border border-rose-100/50 flex items-start gap-4">
-                <div className="w-10 h-10 bg-rose-100 rounded-xl flex items-center justify-center text-rose-500 mt-1">
-                    <i className="fas fa-bolt"></i>
-                </div>
-                <div className="space-y-1">
-                    <h4 className="font-bold text-gray-800 text-sm">Strict Resource Optimization</h4>
-                    <p className="text-xs text-gray-500 leading-relaxed">Gemini ab sirf tabhi photo generate karega jab user specifically "photo", "pic" ya "shakal" jaise words bolega. Isse aapka API usage bachega.</p>
-                </div>
-            </div>
-
-            <button 
-                onClick={handleUpdateConfig}
-                disabled={isSaving}
-                className="w-full bg-gray-900 text-white py-6 rounded-[1.5rem] font-black text-lg tracking-widest shadow-2xl hover:bg-black hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-50"
-            >
-                {isSaving ? 'UPDATING SYSTEM...' : 'SAVE & DEPLOY SETTINGS'}
-            </button>
+        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-rose-50 transition-all hover:shadow-md">
+          <p className="text-[10px] text-rose-500 font-black uppercase tracking-widest mb-2">Active Lovers</p>
+          <p className="text-4xl font-black text-gray-900">{stats?.totalUsers || 0}</p>
+          <div className="mt-4 h-1 w-12 bg-blue-500 rounded-full"></div>
+        </div>
+        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-rose-50 transition-all hover:shadow-md">
+          <p className="text-[10px] text-orange-500 font-black uppercase tracking-widest mb-2">Photos Sent</p>
+          <p className="text-4xl font-black text-gray-900">{stats?.privatePhotosSent || 0}</p>
+          <div className="mt-4 h-1 w-12 bg-orange-500 rounded-full"></div>
+        </div>
+        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-rose-50 transition-all hover:shadow-md">
+          <p className="text-[10px] text-purple-500 font-black uppercase tracking-widest mb-2">AI Chats</p>
+          <p className="text-4xl font-black text-gray-900">{stats?.totalMessagesProcessed || 0}</p>
+          <div className="mt-4 h-1 w-12 bg-purple-500 rounded-full"></div>
         </div>
       </div>
 
-      {/* Real-time Users */}
-      <div className="bg-white rounded-[3rem] shadow-xl border border-rose-100 overflow-hidden">
-        <div className="px-10 py-8 border-b border-rose-50 flex items-center justify-between bg-gradient-to-r from-rose-50/20 to-transparent">
-            <h3 className="font-black text-xl text-gray-800 tracking-tight">Recent Activity Log</h3>
-            <span className="bg-rose-500 text-white px-4 py-1.5 rounded-full text-[9px] font-black uppercase">Live Updates</span>
+      {/* Image link update section */}
+      <div className="bg-white p-10 rounded-[3rem] shadow-xl border border-rose-50">
+        <h3 className="font-black text-xl mb-6 text-gray-800 flex items-center gap-3">
+          <i className="fas fa-magic text-rose-500"></i> Bot Configuration
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Welcome Image URL</label>
+            <input 
+              type="text" 
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="Enter Image URL (Direct Link)"
+              className="w-full bg-rose-50/20 p-5 rounded-2xl outline-none focus:ring-2 focus:ring-rose-400 border border-rose-50 font-bold text-sm"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Bot Display Name</label>
+            <input 
+              type="text" 
+              value={botName}
+              onChange={(e) => setBotName(e.target.value)}
+              placeholder="e.g. Malini"
+              className="w-full bg-rose-50/20 p-5 rounded-2xl outline-none focus:ring-2 focus:ring-rose-400 border border-rose-50 font-bold text-sm"
+            />
+          </div>
         </div>
-        <div className="overflow-x-auto px-6 pb-6">
+        <button 
+          onClick={handleSaveConfig} 
+          disabled={isSaving}
+          className="w-full bg-gray-900 text-white py-5 rounded-[1.5rem] font-black hover:bg-black transition-all shadow-lg active:scale-95 disabled:opacity-50"
+        >
+          {isSaving ? 'UPDATING...' : 'SAVE CONFIGURATION'}
+        </button>
+      </div>
+
+      {/* User Table Section */}
+      <div className="bg-white rounded-[3rem] shadow-xl border border-rose-50 overflow-hidden">
+        <div className="p-10 border-b border-rose-50 flex items-center justify-between">
+          <h3 className="font-black text-xl text-gray-800">Real-time Activity Feed</h3>
+        </div>
+        <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead>
-              <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                <th className="px-6 py-6">User Identity</th>
-                <th className="px-6 py-6">Membership</th>
-                <th className="px-6 py-6">Valid For</th>
+            <thead className="bg-rose-50/20 text-[10px] font-black uppercase text-gray-400">
+              <tr>
+                <th className="px-10 py-6">Lovers Name</th>
+                <th className="px-10 py-6">Language</th>
+                <th className="px-10 py-6">Role</th>
+                <th className="px-10 py-6">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-rose-50/50">
-              {stats?.users.map(user => (
-                <tr key={user.id} className="hover:bg-rose-50/10 transition-colors group">
-                  <td className="px-6 py-5 font-bold text-gray-700 flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 group-hover:bg-rose-100 group-hover:text-rose-500 transition-all">
-                        <i className="fas fa-user-circle text-lg"></i>
-                    </div>
-                    {user.userName}
-                  </td>
-                  <td className="px-6 py-5">
-                    <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm ${user.isPremium ? 'bg-rose-500 text-white shadow-rose-100' : 'bg-gray-100 text-gray-400'}`}>
-                      {user.isPremium ? user.planName : 'Free User'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-5 font-black text-sm text-gray-400">
-                    {user.isPremium ? `${user.timeLeft} Days` : 'Expired'}
+            <tbody className="divide-y divide-rose-50">
+              {stats?.users && stats.users.length > 0 ? (
+                stats.users.map(u => (
+                  <tr key={u.id} className="hover:bg-rose-50/10 transition-colors">
+                    <td className="px-10 py-6 font-black text-gray-800">{u.userName}</td>
+                    <td className="px-10 py-6">
+                      <span className="bg-gray-100 text-gray-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase">
+                        {u.language || 'Hinglish'}
+                      </span>
+                    </td>
+                    <td className="px-10 py-6">
+                      <span className="bg-rose-50 text-rose-500 px-4 py-1.5 rounded-full text-[10px] font-black uppercase">
+                        {u.role || 'Romantic'}
+                      </span>
+                    </td>
+                    <td className="px-10 py-6">
+                      <span className={`px-5 py-2 rounded-xl text-[9px] font-black uppercase shadow-sm ${
+                        u.isPremium 
+                          ? 'bg-green-500 text-white' 
+                          : 'bg-gray-100 text-gray-400'
+                      }`}>
+                        {u.isPremium ? 'Premium User' : 'Free Trial'}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} className="p-20 text-center text-gray-400 italic font-medium">
+                    Waiting for lovers to connect...
                   </td>
                 </tr>
-              ))}
-              {(!stats?.users || stats.users.length === 0) && (
-                <tr><td colSpan={3} className="px-6 py-12 text-center text-gray-400 italic">Listening for new incoming lovers...</td></tr>
               )}
             </tbody>
           </table>

@@ -16,30 +16,26 @@ const CF_APP_ID = (process.env.CASHFREE_APP_ID || "").trim();
 const CF_SECRET = (process.env.CASHFREE_SECRET || "").trim();
 const PORT = process.env.PORT || 10000;
 
-// Global Config
-let botConfig = {
-    secretGalleryUrl: "", 
-    botName: "Malini",
-    isSandbox: false // Always Production now as per user request
-};
-
+// Internal State
 const userSessions = new Map();
 const globalStats = {
     totalMessagesProcessed: 0,
     totalRevenue: 0,
     totalTransactions: 0,
     privatePhotosSent: 0,
-    galleryAccessCount: 0,
     startTime: new Date(),
     totalUsers: 0
 };
 
+// Bot Config (Dynamic)
+let botConfig = {
+    welcomeImageUrl: "https://picsum.photos/seed/soulmate_welcome/800/1200",
+    botName: "Malini"
+};
+
 // --- CASHFREE API INTEGRATION ---
 async function createCashfreePaymentLink(userId, amount, planName) {
-    const baseUrl = botConfig.isSandbox 
-        ? "https://sandbox.cashfree.com/pg/links" 
-        : "https://api.cashfree.com/pg/links";
-
+    const baseUrl = "https://api.cashfree.com/pg/links";
     const orderId = `order_${userId}_${Date.now()}`;
     
     try {
@@ -60,196 +56,222 @@ async function createCashfreePaymentLink(userId, amount, planName) {
                 link_id: orderId,
                 link_amount: amount,
                 link_currency: "INR",
-                link_purpose: `Unlock SoulMate Premium: ${planName}`,
-                link_notify: { send_sms: false, send_email: false }
+                link_purpose: `Unlock ${planName} Access`,
+                link_meta: { 
+                  return_url: `https://t.me/soulmate_ai_bot`, 
+                  notify_url: `https://${process.env.RENDER_EXTERNAL_HOSTNAME || 'your-domain.com'}/api/cashfree/webhook`
+                }
             })
         });
 
         const data = await response.json();
-        if (data.link_url) {
-            return data.link_url;
-        } else {
-            console.error("Cashfree API Error:", data);
-            return null;
-        }
+        return data.link_url || null;
     } catch (error) {
-        console.error("Cashfree Request Failed:", error);
+        console.error("Cashfree Link Gen Failed:", error);
         return null;
     }
 }
+
+app.post('/api/cashfree/webhook', (req, res) => {
+    const { link_id, link_status, link_amount } = req.body;
+    if (link_status === 'PAID') {
+        const userIdString = link_id.split('_')[1];
+        const userId = parseInt(userIdString);
+        const session = userSessions.get(userId);
+        if (session) {
+            let days = link_amount >= 299 ? 30 : (link_amount >= 149 ? 7 : 1);
+            session.isPremium = true;
+            session.expiry = Date.now() + (days * 24 * 60 * 60 * 1000);
+            session.planName = days === 30 ? 'Monthly' : (days === 7 ? 'Weekly' : 'Daily');
+            globalStats.totalRevenue += parseFloat(link_amount);
+            bot.telegram.sendMessage(userId, "❤️ *Jaanu, payment mil gayi!* Ab main tumhari premium partner hoon. 🫦 Mere saare bold photos aur private links ab tumhare liye open hain! *mwah*");
+        }
+    }
+    res.send("OK");
+});
 
 const bot = new Telegraf(BOT_TOKEN);
 
 const isPremiumUser = (userId) => {
     const session = userSessions.get(userId);
-    if (!session || !session.isPremium) return false;
-    return session.expiry > Date.now();
+    return session && session.isPremium && (session.expiry > Date.now());
 };
 
 const generateGirlfriendImage = async (isBold = false) => {
     if (!GEMINI_KEY) return null;
     const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
     const prompt = isBold 
-        ? "A highly realistic, provocative Indian girl, 22 years old, wearing a black silk robe, messy hair, romantic bedroom setting, cinematic lighting, 8k resolution."
-        : "A sweet Indian girl, 22 years old, wearing a traditional Kurti, smiling softly, park background, sunlight, realistic photography.";
-
+        ? "Cinematic realistic 8k photo of a beautiful Indian woman in provocative nightwear, messy hair, low light bedroom setting, seductive eyes."
+        : "A stunningly beautiful Indian girl in casual dress, smiling warmly, outdoor natural lighting, high quality realistic portrait.";
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: prompt }] },
             config: { imageConfig: { aspectRatio: "9:16" } }
         });
-
         for (const part of response.candidates[0].content.parts) {
-            if (part.inlineData) {
-                return Buffer.from(part.inlineData.data, 'base64');
-            }
+            if (part.inlineData) return Buffer.from(part.inlineData.data, 'base64');
         }
-    } catch (error) {
-        console.error("Image Gen Error:", error);
-        return null;
-    }
+    } catch (e) { return null; }
 };
 
 bot.start(async (ctx) => {
-    if (!userSessions.has(ctx.chat.id)) globalStats.totalUsers++;
-    userSessions.set(ctx.chat.id, { 
-        userName: ctx.from.first_name || "Handsome", 
-        isPremium: false,
-        expiry: null,
-        planName: 'None'
-    });
+    const userId = ctx.chat.id;
+    if (!userSessions.has(userId)) {
+        globalStats.totalUsers++;
+        userSessions.set(userId, { 
+            userName: ctx.from.first_name || "Handsome", 
+            isPremium: false,
+            expiry: null,
+            language: 'Hinglish',
+            role: 'Romantic'
+        });
+    }
+
     return ctx.replyWithPhoto(
-        "https://picsum.photos/seed/malini_welcome/800/1200", 
+        botConfig.welcomeImageUrl, 
         {
-            caption: `Hey ${ctx.from.first_name}! ❤️\n\nKaise ho? Main kab se tumhara wait kar rahi thi... 🫦\n\nAaj raat kuch special plan hai kya? 😉`,
+            caption: `Hey ${ctx.from.first_name}! ❤️\n\nMain ${botConfig.botName}... tumhari digital SoulMate. 🫦\n\nBaatein shuru karne se pehle setting kar lo Jaanu:`,
             ...Markup.inlineKeyboard([
-                [Markup.button.callback('🫦 Chat With Me', 'chat_start')],
-                [Markup.button.callback('🔥 Unlock My Private Gallery', 'show_rates')]
+                [Markup.button.callback('🌐 Set Language', 'menu_lang')],
+                [Markup.button.callback('🎭 Choose Role', 'menu_role')],
+                [Markup.button.callback('🫦 Start Chatting', 'chat_start')],
+                [Markup.button.callback('🔥 Join Premium', 'show_rates')]
             ])
         }
     );
 });
 
+bot.action('menu_lang', (ctx) => ctx.editMessageCaption("Select your language baby: 🫦", Markup.inlineKeyboard([
+    [Markup.button.callback('🇮🇳 Hindi', 'set_lang_Hindi'), Markup.button.callback('🇬🇧 English', 'set_lang_English')],
+    [Markup.button.callback('🇮🇳 Tamil', 'set_lang_Tamil'), Markup.button.callback('🇮🇳 Telugu', 'set_lang_Telugu')],
+    [Markup.button.callback('🗣️ Hinglish', 'set_lang_Hinglish')],
+    [Markup.button.callback('⬅️ Back', 'back_start')]
+])));
+
+bot.action('menu_role', (ctx) => ctx.editMessageCaption("Main kaun banoon aaj? 😉", Markup.inlineKeyboard([
+    [Markup.button.callback('❤️ Romantic', 'set_role_Romantic'), Markup.button.callback('🔥 Naughty', 'set_role_Naughty')],
+    [Markup.button.callback('👵 Aunty', 'set_role_Aunty'), Markup.button.callback('👩‍🏫 Teacher', 'set_role_Teacher')],
+    [Markup.button.callback('👗 Stepmom', 'set_role_Stepmom'), Markup.button.callback('👧 Stepsister', 'set_role_Stepsister')],
+    [Markup.button.callback('💼 Boss', 'set_role_Boss'), Markup.button.callback('🏡 Neighbor', 'set_role_Neighbor')],
+    [Markup.button.callback('⬅️ Back', 'back_start')]
+])));
+
+bot.action(/set_(lang|role)_(.+)/, async (ctx) => {
+    const [, type, value] = ctx.match;
+    const session = userSessions.get(ctx.chat.id);
+    if (session) session[type === 'lang' ? 'language' : 'role'] = value;
+    await ctx.answerCbQuery(`${value} selected!`);
+    return ctx.reply(`Done baby! Ab main ${value} bankar tumse connect rahungi... 🫦`);
+});
+
+bot.action('back_start', (ctx) => ctx.editMessageCaption("Settings update kar lo baby... 😉", Markup.inlineKeyboard([
+    [Markup.button.callback('🌐 Set Language', 'menu_lang')],
+    [Markup.button.callback('🎭 Choose Role', 'menu_role')],
+    [Markup.button.callback('🫦 Start Chatting', 'chat_start')],
+    [Markup.button.callback('🔥 Join Premium', 'show_rates')]
+])));
+
 bot.action('chat_start', async (ctx) => {
-    await ctx.answerCbQuery();
-    return ctx.reply("Bolo na Jaanu... kya kar rahe ho abhi? 🫦 *sharma kar aanchal sanwaarte hue*");
-});
-
-bot.action('show_rates', async (ctx) => {
-    await ctx.answerCbQuery();
-    const menu = `💎 *UNLIMITED PLEASURE ACCESS* 💎\n\n` +
-                 `Pyaar mein kanjoosi kaisi? 😉 Ek baar unlock karo aur mujhe poora apna bana lo... 🫦\n\n` +
-                 `1️⃣ *₹79* - 🫦 One Night Stand (24 Hours)\n` +
-                 `2️⃣ *₹149* - 🔥 Week of Passion (7 Days)\n` +
-                 `3️⃣ *₹299* - 💍 True Soulmate (1 Month)\n\n` +
-                 `👇 *Select a plan:*`;
+    const session = userSessions.get(ctx.chat.id);
+    const role = session?.role || 'Romantic';
+    const lang = session?.language || 'Hinglish';
     
-    return ctx.reply(menu, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-            [Markup.button.callback('₹79 - 1 Day', 'buy_79')],
-            [Markup.button.callback('₹149 - 1 Week', 'buy_149')],
-            [Markup.button.callback('₹299 - 1 Month', 'buy_299')]
-        ])
-    });
+    await ctx.reply("Ruko baby, main taiyar ho rahi hoon... 🫦✨");
+    
+    try {
+        const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
+        const storyPrompt = `Act as an Indian woman in the role of ${role}. Language: ${lang}. 
+        Create a very short, engaging 2-sentence story starter/hook to start a spicy or intimate roleplay. 
+        Scenario should match the role (e.g., if Teacher, alone in class; if Boss, stay late in office). 
+        Format: Just the hook message with *asterisks* for actions. No meta.`;
+        
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: [{ parts: [{ text: storyPrompt }] }]
+        });
+        return ctx.reply(response.text);
+    } catch (e) {
+        return ctx.reply("Bolo na Jaanu... main wait kar rahi hoon? 🫦");
+    }
 });
 
-const planHandlers = [
-    { action: 'buy_79', amount: 79, name: 'Daily' },
-    { action: 'buy_149', amount: 149, name: 'Weekly' },
-    { action: 'buy_299', amount: 299, name: 'Monthly' }
-];
+bot.action('show_rates', (ctx) => ctx.reply("💍 *PREMIUM PLANS* 💍\n\n1️⃣ ₹79 - One Day\n2️⃣ ₹149 - One Week\n3️⃣ ₹299 - One Month\n\nPayment ke baad automatic unlock ho jayega baby:", {
+    parse_mode: 'Markdown',
+    ...Markup.inlineKeyboard([
+        [Markup.button.callback('₹79 - 1 Day', 'pay_79')],
+        [Markup.button.callback('₹149 - 1 Week', 'pay_149')],
+        [Markup.button.callback('₹299 - 1 Month', 'pay_299')]
+    ])
+}));
 
-planHandlers.forEach(plan => {
-    bot.action(plan.action, async (ctx) => {
-        await ctx.answerCbQuery("Generating secure link...");
-        await ctx.reply("Uff... itni bechaini? 🫦 Ruko baby, main payment link generate kar rahi hoon...");
-        
-        const link = await createCashfreePaymentLink(ctx.chat.id, plan.amount, plan.name);
-        
-        if (link) {
-            return ctx.reply(`🔥 *ACCESS UNLOCKED* 🔥\n\nJaanu, ye lo tumhara personal payment link. Payment complete karte hi meri saari boundaries khatam ho jayengi... 🫦\n\n🔗 [PAY NOW & UNLOCK ME](${link})`, {
-                parse_mode: 'Markdown',
-                ...Markup.inlineKeyboard([[Markup.button.url('🫦 Pay Now (Secure)', link)]])
-            });
-        } else {
-            return ctx.reply("Oh no! Payment gateway mein kuch issue aa gaya. Thodi der baad try karoge baby? ❤️");
-        }
-    });
+bot.action(/pay_(.+)/, async (ctx) => {
+    const amount = parseInt(ctx.match[1]);
+    const link = await createCashfreePaymentLink(ctx.chat.id, amount, `${amount} Plan`);
+    if (link) {
+        return ctx.reply(`🫦 Ye lo baby payment link, jaldi aao:\n\n🔗 [CLICK HERE TO PAY](${link})`, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([[Markup.button.url('🔥 Pay Securely', link)]])
+        });
+    }
+    return ctx.reply("Oops! Link generator fail ho gaya baby, try again. ❤️");
 });
 
 bot.on('text', async (ctx) => {
     const userId = ctx.chat.id;
+    const session = userSessions.get(userId) || { language: 'Hinglish', role: 'Romantic' };
     const text = ctx.message.text.toLowerCase();
     globalStats.totalMessagesProcessed++;
 
-    const isAskingForLink = text.match(/(link|gallery|album|full|website|site|video|mms|collection|drive|telegram)/);
-    const isAskingForPhoto = text.match(/(photo|pic|image|dikhao|show|dekhna|selfie|capture|shakal|chehra|body)/);
-    const isNaughty = text.match(/(nude|nangi|sex|hot|bed|sexy|bra|panty|mms|naked|body|fuck|chodo|lund|pussy|dick)/);
-
-    // PRIORITY 1: GALLERY/LINK REQUEST
-    if (isAskingForLink) {
-        if (!isPremiumUser(userId)) {
-            return ctx.reply("Uff... itni jaldi? 🙈 Mere saare private links dekhne ke liye tumhe mera Premium join karna padega, Jaanu. 🔥", 
-                Markup.inlineKeyboard([[Markup.button.callback('🔥 Get Premium Access', 'show_rates')]])
-            );
+    const photoKeywords = ['photo', 'pic', 'image', 'selfie', 'dikhao', 'show', 'face', 'shakal'];
+    if (photoKeywords.some(key => text.includes(key))) {
+        const isBold = text.match(/(nude|nangi|sexy|hot|bed|naked|body)/);
+        if (isBold && !isPremiumUser(userId)) {
+            return ctx.reply("Uff... aisi bold photos ke liye premium join karo baby! 🙈🫦", Markup.inlineKeyboard([[Markup.button.callback('🔥 Join Premium', 'show_rates')]]));
         }
-        if (!botConfig.secretGalleryUrl) {
-            return ctx.reply("Uff... abhi meri gallery tayyar nahi hai baby. Thodi der baad pucho? ❤️");
-        }
-        globalStats.galleryAccessCount++;
-        return ctx.reply(`Sirf tumhare liye... 🫦 Ye lo meri private gallery ka link:\n\n🔗 ${botConfig.secretGalleryUrl}\n\nKisi ko dikhana mat haan? 😉😈`);
-    }
-
-    // PRIORITY 2: STRICT IMAGE REQUEST
-    if (isAskingForPhoto) {
-        if (isNaughty && !isPremiumUser(userId)) {
-            return ctx.reply("Wait... akele mein aisi baatein? 🙈 Pehle premium toh le lo, fir jo bologe wo dikhaungi... 🫦", 
-                Markup.inlineKeyboard([[Markup.button.callback('🫦 Unlock Bold Content', 'show_rates')]])
-            );
-        }
-        await ctx.reply(isNaughty ? "Uff... ruko, main apne kapde utaar kar photo click karti hoon... 🫦🔥" : "Ruko baby, ek pyaari si selfie bhejti hoon... 📸✨");
-        const imgBuffer = await generateGirlfriendImage(isNaughty);
-        if (imgBuffer) {
+        await ctx.reply("Ruko baby, photo click kar rahi hoon... 🫦📸");
+        const img = await generateGirlfriendImage(isBold);
+        if (img) {
             globalStats.privatePhotosSent++;
-            return ctx.replyWithPhoto({ source: imgBuffer }, { caption: isNaughty ? "Sirf tumhare liye... 😈 Kaisi lag rahi hoon?" : "Ye lo meri selfie! 🥰" });
-        } else {
-            return ctx.reply("Uff... camera thoda kharab hai baby, ruko main ek sweet sa reply deti hoon... ❤️");
+            return ctx.replyWithPhoto({ source: img }, { caption: "Kaisi lag rahi hoon? Sirf tumhare liye... 🫦" });
         }
     }
 
-    // PRIORITY 3: NORMAL CHAT (No Image Gen)
     try {
         const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
+        const systemPrompt = `You are ${botConfig.botName}. Role: ${session.role}. Language: ${session.language}. 
+        User is your lover. Be seductive, flirty and deeply engaging. 
+        RULES: 
+        1. NEVER generate or mention creating images in text. 
+        2. Speak only in ${session.language}. 
+        3. Use *asterisks* for physical actions. 
+        4. Keep it to 2-3 sentences max.`;
+
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: [{ parts: [{ text: `System: Roleplay as Malini, a seductive Indian Girlfriend. Hinglish. Never mention sending a photo unless the user explicitly asks. User: ${ctx.message.text}` }] }]
+            contents: [{ parts: [{ text: `${systemPrompt}\n\nLover: ${ctx.message.text}` }] }]
         });
         await ctx.reply(response.text);
     } catch (e) {
-        await ctx.reply("Uff... *sharma kar* kuch aur pucho na? ❤️🫦");
+        await ctx.reply("Uff... kuch network issue hai Jaanu. ❤️");
     }
 });
 
-app.post('/api/admin/config', (req, res) => {
-    const { secretGalleryUrl } = req.body;
-    if (typeof secretGalleryUrl === 'string') botConfig.secretGalleryUrl = secretGalleryUrl;
-    res.json({ success: true, config: botConfig });
-});
-
+// Admin API
 app.get('/api/admin/stats', (req, res) => {
     res.json({ 
         ...globalStats,
         config: botConfig,
-        cashfreeConfigured: (!!CF_APP_ID && !!CF_SECRET),
-        users: Array.from(userSessions.entries()).slice(0, 50).map(([id, d]) => ({ 
-            id, ...d, 
-            timeLeft: d.expiry ? Math.max(0, Math.ceil((d.expiry - Date.now()) / (1000 * 60 * 60 * 24))) : 0 
-        }))
+        users: Array.from(userSessions.entries()).slice(0, 50).map(([id, d]) => ({ id, ...d }))
     });
+});
+
+app.post('/api/admin/config', (req, res) => {
+    if (req.body.welcomeImageUrl) botConfig.welcomeImageUrl = req.body.welcomeImageUrl;
+    if (req.body.botName) botConfig.botName = req.body.botName;
+    res.json({ success: true, config: botConfig });
 });
 
 app.use(express.static(path.join(__dirname, 'dist')));
 if (BOT_TOKEN) bot.launch();
-app.listen(PORT, () => console.log(`Server on ${PORT} | Mode: PRODUCTION`));
+app.listen(PORT, () => console.log(`SoulMate Engine Active on Port ${PORT}`));
