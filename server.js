@@ -11,9 +11,11 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-// Webhook for Cashfree
+// Webhook for Cashfree (MUST match notify_url in pay.js)
 app.post('/api/cashfree/webhook', (req, res) => {
+    console.log("📥 Cashfree Webhook Received:", req.body);
     const { link_id, link_status, link_amount } = req.body;
+    
     if (link_status === 'PAID') {
         try {
             const userId = parseInt(link_id.split('_')[1]);
@@ -23,9 +25,15 @@ app.post('/api/cashfree/webhook', (req, res) => {
                 session.isPremium = true;
                 session.expiry = Date.now() + (days * 24 * 60 * 60 * 1000);
                 globalStats.totalRevenue += parseFloat(link_amount);
-                if (bot) bot.telegram.sendMessage(userId, "❤️ *Jaanu, payment mil gayi!* Ab main tumhari premium partner hoon! *mwah*");
+                
+                if (bot) {
+                    bot.telegram.sendMessage(userId, "❤️ *Jaanu, payment mil gayi!* \n\nAb main tumhari premium partner hoon! Mere saare bold photos ab tumhare liye open hain... *mwah* 🫦🫦", { parse_mode: 'Markdown' });
+                }
+                console.log(`✅ User ${userId} upgraded to Premium!`);
             }
-        } catch (e) { console.error("Webhook Error:", e); }
+        } catch (e) { 
+            console.error("❌ Webhook Process Error:", e); 
+        }
     }
     res.send("OK");
 });
@@ -45,7 +53,7 @@ app.listen(PORT, () => {
     console.log(`🚀 SoulMate Engine Active on Port ${PORT}`);
     if (bot) {
         bot.launch()
-            .then(() => console.log("✅ Telegram Bot Launched"))
+            .then(() => console.log("✅ Telegram Bot Launched Successfully"))
             .catch(err => console.error("❌ Bot Launch Failed:", err.message));
     }
 });

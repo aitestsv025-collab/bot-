@@ -15,6 +15,15 @@ export function isPremiumUser(userId) {
     return session && session.isPremium && (session.expiry > Date.now());
 }
 
+export function incrementMessageCount(userId) {
+    const session = userSessions.get(userId);
+    if (session) {
+        session.messageCount = (session.messageCount || 0) + 1;
+        return session.messageCount;
+    }
+    return 0;
+}
+
 export function incrementImageCount(userId) {
     const session = userSessions.get(userId);
     if (session) {

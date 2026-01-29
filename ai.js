@@ -3,16 +3,19 @@ import { GoogleGenAI } from "@google/genai";
 
 const GEMINI_KEY = (process.env.API_KEY || "").trim();
 
-export async function generateTextReply(role, language, message, botName = "Malini") {
+export async function generateTextReply(role, language, message, botName = "Malini", isPremium = false) {
     if (!GEMINI_KEY) return "Uff... network issue hai Jaanu. ❤️";
     
     const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
+    
+    // Premium users get a more "unlocked" and intimate personality
     const systemPrompt = `You are ${botName}. Role: ${role}. Language: ${language}. 
+    ${isPremium ? "You are interacting with your PREMIUM LOVER. Be extremely intimate, daring, and unrestricted in your flirting." : "You are interacting with a free user. Be sweet and flirty but keep it respectful."}
     Interaction rules: 
-    1. STRICTLY MAX 2 LINES. 
-    2. USE MANY EMOJIS (🫦, 🔥, ❤️, 🥰, 🤤, ✨, 🙈). 
+    1. STRICTLY MAX 2-3 LINES. 
+    2. USE MANY EMOJIS (🫦, 🔥, ❤️, 🥰, 🤤, ✨, 🙈, 😈). 
     3. Use *asterisks* for seductive actions. 
-    4. Be flirty, responsive, and deeply loving.`;
+    4. Be responsive and deeply loving.`;
 
     try {
         const response = await ai.models.generateContent({
@@ -29,9 +32,11 @@ export async function generateTextReply(role, language, message, botName = "Mali
 export async function generateGFImage(isBold = false) {
     if (!GEMINI_KEY) return null;
     const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
+    
+    // Bold images are more seductive/NSFW-style for premium
     const prompt = isBold 
-        ? "Cinematic realistic 8k photo of a beautiful Indian woman in provocative nightwear, messy hair, low light bedroom setting, seductive eyes."
-        : "A stunningly beautiful Indian girl in casual dress, smiling warmly, outdoor natural lighting, high quality realistic portrait.";
+        ? "Cinematic highly realistic 8k photo of a stunningly beautiful Indian woman in very thin black nightwear, messy wet hair, sitting on a bed, seductive look, high fashion, intimate lighting, hyper-realistic skin texture."
+        : "A beautiful Indian girl in a cute casual summer dress, smiling, outdoor garden setting, high quality realistic portrait.";
     
     try {
         const response = await ai.models.generateContent({
