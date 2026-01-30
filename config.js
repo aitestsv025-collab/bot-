@@ -1,22 +1,29 @@
 
-// Robust config for Render environment
-const cleanEnv = (names) => {
-    for (const name of names) {
-        let val = process.env[name];
-        if (val && val !== "undefined" && val !== "null") {
-            // Remove quotes, spaces, and hidden characters
-            val = val.toString().trim().replace(/['"\s]/g, '');
-            if (val.length > 5) return val; // Basic length check to avoid empty strings
+// Super robust environment loader
+const getEnv = (possibleNames) => {
+    // 1. Try exact matches first
+    for (const name of possibleNames) {
+        const val = process.env[name];
+        if (val && val.trim().length > 5) return val.trim().replace(/['"]/g, '');
+    }
+    
+    // 2. Try case-insensitive search if still not found
+    const allKeys = Object.keys(process.env);
+    for (const name of possibleNames) {
+        const foundKey = allKeys.find(k => k.toUpperCase() === name.toUpperCase());
+        if (foundKey) {
+            const val = process.env[foundKey];
+            if (val && val.trim().length > 5) return val.trim().replace(/['"]/g, '');
         }
     }
     return "";
 };
 
 export const CONFIG = {
-    TELEGRAM_TOKEN: cleanEnv(['TELEGRAM_TOKEN', 'BOT_TOKEN', 'TOKEN']),
-    GEMINI_KEY: cleanEnv(['GEMINI_KEY', 'API_KEY', 'GEMINI_API_KEY']),
-    CASHFREE_APP_ID: cleanEnv(['CASHFREE_APP_ID', 'CASH_APP_ID', 'CASHFREE_ID']),
-    CASHFREE_SECRET: cleanEnv(['CASHFREE_SECRET', 'CASH_SECRET', 'CASHFREE_KEY']),
+    TELEGRAM_TOKEN: getEnv(['TELEGRAM_TOKEN', 'BOT_TOKEN', 'TOKEN']),
+    GEMINI_KEY: getEnv(['GEMINI_KEY', 'API_KEY', 'GEMINI_API_KEY']),
+    CASHFREE_APP_ID: getEnv(['CASHFREE_APP_ID', 'CASH_APP_ID', 'CASHFREE_ID']),
+    CASHFREE_SECRET: getEnv(['CASHFREE_SECRET', 'CASH_SECRET', 'CASHFREE_KEY']),
     CASHFREE_MODE: (process.env.CASHFREE_MODE || "PROD").toUpperCase(),
     FREE_MESSAGE_LIMIT: 50,
     BOT_NAME: "Malini",
@@ -30,5 +37,6 @@ export function checkSystem() {
     console.log(`- Gemini Key: ${CONFIG.GEMINI_KEY ? '✅ LOADED' : '❌ MISSING'}`);
     console.log(`- Cashfree ID: ${CONFIG.CASHFREE_APP_ID ? '✅ LOADED' : '❌ MISSING'}`);
     console.log(`- Host: ${CONFIG.HOST}`);
+    console.log("Available Process Keys:", Object.keys(process.env).filter(k => k.includes('CASH') || k.includes('KEY') || k.includes('TOKEN')));
     console.log("-----------------------------------------");
 }

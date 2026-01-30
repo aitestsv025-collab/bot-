@@ -28,10 +28,10 @@ export async function handlePaymentTrigger(ctx) {
     const missing = [];
     if (!CONFIG.CASHFREE_APP_ID) missing.push("CASHFREE_APP_ID");
     if (!CONFIG.CASHFREE_SECRET) missing.push("CASHFREE_SECRET");
-    if (!CONFIG.GEMINI_KEY) missing.push("GEMINI_KEY (ya API_KEY)");
+    if (!CONFIG.GEMINI_KEY) missing.push("GEMINI_KEY/API_KEY");
 
     if (missing.length > 0) {
-        const errorHtml = `<b>❌ ADMIN ERROR</b>\n\nBaby, aapne Render mein ye keys nahi dali hain:\n\n${missing.map(m => `• <code>${m}</code>`).join('\n')}\n\n<b>Fix kaise karein?</b>\n1. Render Dashboard jayein.\n2. Environment tab mein <b>Add Environment Variable</b> karein.\n3. Keys ke naam upar wale hi rakhein.`;
+        const errorHtml = `<b>❌ CONFIGURATION ERROR</b>\n\nJaanu, mere system mein ye keys nahi mil rahi:\n\n${missing.map(m => `• <code>${m}</code>`).join('\n')}\n\n<b>Ye sahi kaise hoga?</b>\nRender Dashboard mein jayein aur keys ke naam check karein.`;
         return ctx.reply(errorHtml, { parse_mode: 'HTML' });
     }
 
@@ -59,7 +59,7 @@ export async function handlePaymentTrigger(ctx) {
                 ctx.chat.id,
                 statusMsg.message_id,
                 null,
-                `<b>❌ CASHFREE ERROR:</b>\n<code>${result.error}</code>\n\nBaby, Cashfree link nahi ban paya. Check karo keys Prod mode ki hain ya Test mode ki.`,
+                `<b>❌ PAYMENT FAILED</b>\n\n<b>Reason:</b> <code>${result.error || 'Unknown Error'}</code>\n\nBaby, Cashfree ne mana kar diya. Shayad API keys galat hain ya project PROD mode mein nahi hai.`,
                 { parse_mode: 'HTML' }
             );
         }
