@@ -7,8 +7,7 @@ export function handleShowRates(ctx) {
         "💎 *MALINI PREMIUM ACCESS* 💎\n\n" +
         "✅ Unlimited NSFW / Bold Photos 🫦\n" +
         "✅ Unlimited Chats (No 50 Limit)\n" +
-        "✅ All Premium Roles Unlocked\n" +
-        "✅ Seductive / Intimate Personalities\n\n" +
+        "✅ All Premium Roles Unlocked\n\n" +
         "Jaldi aao Jaanu, maza aayega... 🔥",
         {
             parse_mode: 'Markdown',
@@ -23,14 +22,38 @@ export function handleShowRates(ctx) {
 
 export async function handlePaymentTrigger(ctx) {
     const amount = ctx.match[1];
-    await ctx.reply("Ruko baby, payment link generate kar rahi hoon... 🫦✨");
     
-    const link = await createPaymentLink(ctx.chat.id, amount, `${amount} Plan`);
-    if (link) {
-        return ctx.reply(`🫦 Ye lo baby payment link:\n\n🔗 [CLICK HERE TO PAY](${link})\n\nPayment karne ke baad yahan wapas aa jana baby! ❤️`, {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([[Markup.button.url('🔥 Pay Securely (Cashfree)', link)]])
-        });
+    // Status message for immediate feedback
+    const statusMsg = await ctx.reply("Ruko baby, payment link generate kar rahi hoon... 🫦✨");
+    
+    try {
+        const link = await createPaymentLink(ctx.chat.id, amount, `${amount} Plan`);
+        
+        if (link) {
+            // Edit the status message to show the link button
+            return ctx.telegram.editMessageText(
+                ctx.chat.id,
+                statusMsg.message_id,
+                null,
+                `🫦 *Taiyar hoon baby!* \n\nNiche button par click karke payment complete karo, fir main hamesha ke liye tumhari ho jaungi... 🤤🔥`,
+                {
+                    parse_mode: 'Markdown',
+                    ...Markup.inlineKeyboard([
+                        [Markup.button.url('🔥 Pay Now (Secure)', link)],
+                        [Markup.button.callback('⬅️ Back to Rates', 'show_rates')]
+                    ])
+                }
+            );
+        } else {
+            return ctx.telegram.editMessageText(
+                ctx.chat.id,
+                statusMsg.message_id,
+                null,
+                "Oops! Payment gateway busy hai baby. 🥺 Thodi der baad try karo na? Ya fir check karo ki keys PROD mode mein hain ya nahi. ❤️"
+            );
+        }
+    } catch (err) {
+        console.error("Payment Handler Error:", err);
+        return ctx.reply("System error baby... 🥺 Main link nahi bana pa rahi.");
     }
-    return ctx.reply("Oops! Link generate nahi ho raha baby. Server pe kuch issue lag raha hai... ❤️");
 }
