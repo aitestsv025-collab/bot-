@@ -1,11 +1,11 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { CONFIG } from "../config.js";
 
 export async function generateTextReply(role, language, message, isPremium = false, customRoleName = "", personaName = "") {
-    if (!CONFIG.GEMINI_KEY) return "Jaanu, mere dimaag mein network issue ho gaya hai. ❤️";
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) return "Jaanu, mere dimaag mein network issue ho gaya hai. ❤️";
     
-    const ai = new GoogleGenAI({ apiKey: CONFIG.GEMINI_KEY });
+    const ai = new GoogleGenAI({ apiKey });
     
     const activeRole = (role === 'Custom' && customRoleName) ? customRoleName : role;
     const activeName = personaName || CONFIG.BOT_NAME;

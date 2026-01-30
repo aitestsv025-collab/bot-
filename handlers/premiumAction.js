@@ -1,6 +1,6 @@
-
 import { Markup } from 'telegraf';
 import { createPaymentLink } from '../services/payment.js';
+import { CONFIG } from '../config.js';
 
 export function handleShowRates(ctx) {
     return ctx.reply(
@@ -23,14 +23,17 @@ export function handleShowRates(ctx) {
 export async function handlePaymentTrigger(ctx) {
     const amount = ctx.match[1];
     
-    // Status message for immediate feedback
+    // Check if keys are missing globally to notify admin user
+    if (!CONFIG.CASHFREE_APP_ID || !CONFIG.CASHFREE_SECRET) {
+        return ctx.reply("❌ *ADMIN ERROR:* Cashfree Environment Variables missing! \n\nPlease check `CASHFREE_APP_ID` and `CASHFREE_SECRET` in your Render dashboard.", { parse_mode: 'Markdown' });
+    }
+
     const statusMsg = await ctx.reply("Ruko baby, payment link generate kar rahi hoon... 🫦✨");
     
     try {
         const link = await createPaymentLink(ctx.chat.id, amount, `${amount} Plan`);
         
         if (link) {
-            // Edit the status message to show the link button
             return ctx.telegram.editMessageText(
                 ctx.chat.id,
                 statusMsg.message_id,
@@ -49,7 +52,7 @@ export async function handlePaymentTrigger(ctx) {
                 ctx.chat.id,
                 statusMsg.message_id,
                 null,
-                "Oops! Payment gateway busy hai baby. 🥺 Thodi der baad try karo na? Ya fir check karo ki keys PROD mode mein hain ya nahi. ❤️"
+                "Oops! Payment gateway busy hai baby. 🥺 Thodi der baad try karo na? \n\n(Tip: Check if you are using PROD keys but mode is set to Sandbox)"
             );
         }
     } catch (err) {
