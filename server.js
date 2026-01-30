@@ -1,4 +1,5 @@
 
+import 'dotenv/config'; // Top priority
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -11,7 +12,7 @@ const app = express();
 app.use(express.json());
 
 // Run Diagnostics
-const isFaulty = checkSystem();
+checkSystem();
 
 app.post('/api/cashfree/webhook', (req, res) => {
     console.log("🔔 WEBHOOK RECEIVED:", JSON.stringify(req.body, null, 2));

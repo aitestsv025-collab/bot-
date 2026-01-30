@@ -1,20 +1,23 @@
-import 'dotenv/config';
+
+// Dotenv is handled in server.js entry point
 
 const getEnv = (names) => {
     for (const name of names) {
         const val = process.env[name];
-        if (val) return val.trim().replace(/['"]/g, ''); // Remove accidental quotes
+        if (val && val.trim().length > 0) {
+            return val.trim().replace(/['"]/g, ''); 
+        }
     }
     return "";
 };
 
-const secret = getEnv(['CASHFREE_SECRET', 'CASH_SECRET', 'CASHFREE_KEY']);
+const secret = getEnv(['CASHFREE_SECRET', 'CASH_SECRET', 'CASHFREE_KEY', 'CASH_FREE_SECRET']);
+const appId = getEnv(['CASHFREE_APP_ID', 'CASH_APP_ID', 'CASHFREE_ID', 'CASH_FREE_APP_ID']);
 
 export const CONFIG = {
     TELEGRAM_TOKEN: getEnv(['TELEGRAM_TOKEN', 'BOT_TOKEN']),
-    CASHFREE_APP_ID: getEnv(['CASHFREE_APP_ID', 'CASH_APP_ID', 'CASHFREE_ID']),
+    CASHFREE_APP_ID: appId,
     CASHFREE_SECRET: secret,
-    // Auto-detect PROD if secret contains 'prod'
     CASHFREE_MODE: (process.env.CASHFREE_MODE || (secret.toLowerCase().includes('prod') ? "PROD" : "SANDBOX")).toUpperCase(),
     FREE_MESSAGE_LIMIT: 50,
     BOT_NAME: "Malini",
@@ -24,19 +27,10 @@ export const CONFIG = {
 export function checkSystem() {
     console.log("-----------------------------------------");
     console.log("🔍 SOULMATE STARTUP DIAGNOSTIC:");
-    console.log(`- Bot Token: ${CONFIG.TELEGRAM_TOKEN ? '✅ Found' : '❌ MISSING'}`);
-    console.log(`- Gemini Key (API_KEY): ${process.env.API_KEY ? '✅ Found' : '❌ MISSING'}`);
-    console.log(`- Cashfree ID: ${CONFIG.CASHFREE_APP_ID ? '✅ Found (' + CONFIG.CASHFREE_APP_ID + ')' : '❌ MISSING'}`);
-    console.log(`- Cashfree Secret: ${CONFIG.CASHFREE_SECRET ? '✅ Found' : '❌ MISSING'}`);
-    console.log(`- Cashfree Mode: ${CONFIG.CASHFREE_MODE}`);
-    console.log(`- Host URL: ${CONFIG.HOST}`);
+    console.log(`- Bot Token: ${CONFIG.TELEGRAM_TOKEN ? '✅ Found (' + CONFIG.TELEGRAM_TOKEN.substring(0, 5) + '...)' : '❌ MISSING'}`);
+    console.log(`- Gemini Key: ${process.env.API_KEY ? '✅ Found (' + process.env.API_KEY.substring(0, 5) + '...)' : '❌ MISSING'}`);
+    console.log(`- Cashfree ID: ${CONFIG.CASHFREE_APP_ID ? '✅ Found (' + CONFIG.CASHFREE_APP_ID.substring(0, 5) + '...)' : '❌ MISSING'}`);
+    console.log(`- Cashfree Secret: ${CONFIG.CASHFREE_SECRET ? '✅ Found (' + CONFIG.CASHFREE_SECRET.substring(0, 5) + '...)' : '❌ MISSING'}`);
+    console.log(`- Mode: ${CONFIG.CASHFREE_MODE}`);
     console.log("-----------------------------------------");
-    
-    const missing = [];
-    if (!CONFIG.TELEGRAM_TOKEN) missing.push("TELEGRAM_TOKEN");
-    if (!process.env.API_KEY) missing.push("API_KEY");
-    if (!CONFIG.CASHFREE_APP_ID) missing.push("CASHFREE_APP_ID");
-    if (!CONFIG.CASHFREE_SECRET) missing.push("CASHFREE_SECRET");
-    
-    return missing;
 }

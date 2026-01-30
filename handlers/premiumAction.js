@@ -1,3 +1,4 @@
+
 import { Markup } from 'telegraf';
 import { createPaymentLink } from '../services/payment.js';
 import { CONFIG } from '../config.js';
@@ -23,9 +24,14 @@ export function handleShowRates(ctx) {
 export async function handlePaymentTrigger(ctx) {
     const amount = ctx.match[1];
     
-    // Check if keys are missing globally to notify admin user
-    if (!CONFIG.CASHFREE_APP_ID || !CONFIG.CASHFREE_SECRET) {
-        return ctx.reply("❌ *ADMIN ERROR:* Cashfree Environment Variables missing! \n\nPlease check `CASHFREE_APP_ID` and `CASHFREE_SECRET` in your Render dashboard.", { parse_mode: 'Markdown' });
+    // Debug info for admin
+    const missing = [];
+    if (!CONFIG.CASHFREE_APP_ID) missing.push("CASHFREE_APP_ID");
+    if (!CONFIG.CASHFREE_SECRET) missing.push("CASHFREE_SECRET");
+    if (!process.env.API_KEY) missing.push("API_KEY (Gemini)");
+
+    if (missing.length > 0) {
+        return ctx.reply(`❌ *ADMIN ERROR:* Kuch keys missing hain baby! \n\nCheck Render Dashboard: \n${missing.map(m => `• ${m}`).join('\n')}`, { parse_mode: 'Markdown' });
     }
 
     const statusMsg = await ctx.reply("Ruko baby, payment link generate kar rahi hoon... 🫦✨");
@@ -52,7 +58,7 @@ export async function handlePaymentTrigger(ctx) {
                 ctx.chat.id,
                 statusMsg.message_id,
                 null,
-                "Oops! Payment gateway busy hai baby. 🥺 Thodi der baad try karo na? \n\n(Tip: Check if you are using PROD keys but mode is set to Sandbox)"
+                "Oops! Cashfree ne request reject kar di baby. 🥺 Shayad keys invalid hain ya mode galat set hai. \n\nCheck Render Logs for exact reason!"
             );
         }
     } catch (err) {
