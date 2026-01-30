@@ -3,11 +3,11 @@ import { GoogleGenAI } from "@google/genai";
 import { CONFIG } from "../config.js";
 
 export async function generateTextReply(role, language, message, isPremium = false, customRoleName = "", personaName = "") {
-    const apiKey = CONFIG.GEMINI_KEY || process.env.API_KEY;
+    const apiKey = CONFIG.GEMINI_KEY;
     
     if (!apiKey) {
-        console.error("❌ AI TEXT ERROR: No API Key found.");
-        return "Jaanu, mere dimaag mein network issue ho gaya hai. ❤️";
+        console.error("❌ AI TEXT ERROR: No Gemini Key found in CONFIG.");
+        return "Jaanu, mere dimaag mein network issue ho gaya hai. ❤️ Admin se kaho Gemini key check kare!";
     }
     
     const ai = new GoogleGenAI({ apiKey });

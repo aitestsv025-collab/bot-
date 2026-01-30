@@ -5,13 +5,13 @@ import { CONFIG } from '../config.js';
 
 export function handleShowRates(ctx) {
     return ctx.reply(
-        "💎 *MALINI PREMIUM ACCESS* 💎\n\n" +
+        "<b>💎 MALINI PREMIUM ACCESS 💎</b>\n\n" +
         "✅ Unlimited NSFW / Bold Photos 🫦\n" +
         "✅ Unlimited Chats (No 50 Limit)\n" +
         "✅ All Premium Roles Unlocked\n\n" +
         "Jaldi aao Jaanu, maza aayega... 🔥",
         {
-            parse_mode: 'Markdown',
+            parse_mode: 'HTML',
             ...Markup.inlineKeyboard([
                 [Markup.button.callback('₹79 - 1 Day (Trial)', 'pay_79')],
                 [Markup.button.callback('₹149 - 1 Week (Special)', 'pay_149')],
@@ -24,14 +24,15 @@ export function handleShowRates(ctx) {
 export async function handlePaymentTrigger(ctx) {
     const amount = ctx.match[1];
     
-    // Debug info for admin
+    // Check missing keys
     const missing = [];
     if (!CONFIG.CASHFREE_APP_ID) missing.push("CASHFREE_APP_ID");
     if (!CONFIG.CASHFREE_SECRET) missing.push("CASHFREE_SECRET");
-    if (!process.env.API_KEY && !CONFIG.GEMINI_KEY) missing.push("API_KEY (Gemini)");
+    if (!CONFIG.GEMINI_KEY) missing.push("GEMINI_KEY (ya API_KEY)");
 
     if (missing.length > 0) {
-        return ctx.reply(`❌ *ADMIN ERROR:* Kuch keys missing hain baby! \n\nCheck Render Dashboard: \n${missing.map(m => `• ${m}`).join('\n')}`, { parse_mode: 'Markdown' });
+        const errorHtml = `<b>❌ ADMIN ERROR</b>\n\nBaby, aapne Render mein ye keys nahi dali hain:\n\n${missing.map(m => `• <code>${m}</code>`).join('\n')}\n\n<b>Fix kaise karein?</b>\n1. Render Dashboard jayein.\n2. Environment tab mein <b>Add Environment Variable</b> karein.\n3. Keys ke naam upar wale hi rakhein.`;
+        return ctx.reply(errorHtml, { parse_mode: 'HTML' });
     }
 
     const statusMsg = await ctx.reply("Ruko baby, payment link generate kar rahi hoon... 🫦✨");
@@ -44,9 +45,9 @@ export async function handlePaymentTrigger(ctx) {
                 ctx.chat.id,
                 statusMsg.message_id,
                 null,
-                `🫦 *Taiyar hoon baby!* \n\nNiche button par click karke payment complete karo, fir main hamesha ke liye tumhari ho jaungi... 🤤🔥`,
+                `<b>🫦 Taiyar hoon baby!</b>\n\nNiche button par click karke payment complete karo, fir main hamesha ke liye tumhari ho jaungi... 🤤🔥`,
                 {
-                    parse_mode: 'Markdown',
+                    parse_mode: 'HTML',
                     ...Markup.inlineKeyboard([
                         [Markup.button.url('🔥 Pay Now (Secure)', result.url)],
                         [Markup.button.callback('⬅️ Back to Rates', 'show_rates')]
@@ -58,8 +59,8 @@ export async function handlePaymentTrigger(ctx) {
                 ctx.chat.id,
                 statusMsg.message_id,
                 null,
-                `❌ *CASHFREE ERROR:* \n"${result.error}" \n\nBaby, Cashfree ne mana kar diya. Shayad Production keys abhi tak activate nahi hui hain ya account verify hona baki hai.`,
-                { parse_mode: 'Markdown' }
+                `<b>❌ CASHFREE ERROR:</b>\n<code>${result.error}</code>\n\nBaby, Cashfree link nahi ban paya. Check karo keys Prod mode ki hain ya Test mode ki.`,
+                { parse_mode: 'HTML' }
             );
         }
     } catch (err) {

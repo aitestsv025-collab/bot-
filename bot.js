@@ -12,18 +12,18 @@ import { processIncomingMessage } from './handlers/messageProcessor.js';
 export const bot = CONFIG.TELEGRAM_TOKEN ? new Telegraf(CONFIG.TELEGRAM_TOKEN) : null;
 
 if (bot) {
-    // 1. Diagnostics Command
+    // 1. Diagnostics Command (Fixed with HTML)
     bot.command('status', (ctx) => {
         const status = [
-            "🛠 *BOT DIAGNOSTICS* 🛠",
+            "<b>🛠 BOT DIAGNOSTICS 🛠</b>",
             `• Bot Token: ${CONFIG.TELEGRAM_TOKEN ? '✅ Found' : '❌ Missing'}`,
             `• Gemini Key: ${CONFIG.GEMINI_KEY ? '✅ Found' : '❌ Missing'}`,
             `• Cashfree ID: ${CONFIG.CASHFREE_APP_ID ? '✅ Found' : '❌ Missing'}`,
             `• Cashfree Secret: ${CONFIG.CASHFREE_SECRET ? '✅ Found' : '❌ Missing'}`,
-            `• Server URL: \`${CONFIG.HOST}\``,
-            "\n*Note:* Agar koi ❌ hai, to Render settings mein key check karein baby! ❤️"
+            `• Server URL: <code>${CONFIG.HOST}</code>`,
+            "\n<b>Note:</b> Agar koi ❌ hai, to Render settings mein key check karein baby! ❤️"
         ].join('\n');
-        return ctx.reply(status, { parse_mode: 'Markdown' });
+        return ctx.reply(status, { parse_mode: 'HTML' });
     });
 
     // 2. Start Logic
@@ -48,7 +48,7 @@ if (bot) {
         } catch (e) { console.error(e); }
     });
 
-    // 3. Handlers with safety
+    // 3. Handlers
     bot.action(/set_lang_(.+)/, async (ctx) => {
         try { await handleLanguageSelection(ctx); } catch(e) { console.error(e); }
     });
@@ -65,7 +65,7 @@ if (bot) {
             await processIncomingMessage(ctx);
         } catch (err) {
             console.error("Critical Msg Error:", err);
-            ctx.reply("Oops baby! *sharma kar* kuch error aa gaya. ❤️\n\nAdmin check: " + err.message);
+            ctx.reply("Oops baby! *sharma kar* kuch error aa gaya. ❤️\n\nError: " + err.message);
         }
     });
 } else {
