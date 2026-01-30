@@ -45,13 +45,24 @@ export async function handlePaymentTrigger(ctx) {
                 }
             );
         } else {
-            // Log the exact error to the user for debugging
+            let errorMsg = `<b>❌ Payment Issue!</b>\n\n<code>${result.error}</code>\n\n`;
+            
+            if (result.error_type === 'FEATURE_DISABLED') {
+                errorMsg += "⚠️ <b>ACTION REQUIRED:</b> Aapke Cashfree account mein 'Payment Links' feature abhi disabled hai. Cashfree Dashboard > Activation mein jaakar use enable karein.";
+            }
+
             return ctx.telegram.editMessageText(
                 userId,
                 statusMsg.message_id,
                 null,
-                `<b>❌ Payment Link Error:</b>\n\n<code>${result.error}</code>\n\nBaby, lagta hai API keys mein kuch gadbad hai. Admin Dashboard check karo! 🥺`,
-                { parse_mode: 'HTML' }
+                errorMsg,
+                { 
+                    parse_mode: 'HTML',
+                    ...Markup.inlineKeyboard([
+                        [Markup.button.url('Dashboard Check Karo', 'https://merchant.cashfree.com/merchant/pg')],
+                        [Markup.button.callback('Retry', 'show_rates')]
+                    ])
+                }
             ).catch(e => console.error(e));
         }
     } catch (err) {

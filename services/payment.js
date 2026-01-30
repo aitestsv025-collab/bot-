@@ -1,22 +1,20 @@
 
 import { CONFIG } from "../config.js";
+import { globalStats } from "../state.js";
 
 export async function createPaymentLink(userId, amount, planName) {
     const appId = CONFIG.CASHFREE_APP_ID;
     const secret = CONFIG.CASHFREE_SECRET;
 
     if (!appId || !secret) {
-        console.error("❌ Cashfree Credentials Missing in Environment Variables!");
         return { success: false, error: "API Keys are missing in Server Settings." };
     }
 
-    // Determine environment
     const isProd = CONFIG.CASHFREE_MODE === "PROD";
     const baseUrl = isProd 
         ? "https://api.cashfree.com/pg/links" 
         : "https://sandbox.cashfree.com/pg/links";
     
-    // Format: L_USERID_TIMESTAMP (Max length limit check)
     const linkId = `L_${userId}_${Math.floor(Date.now() / 1000)}`;
     
     try {
@@ -36,8 +34,6 @@ export async function createPaymentLink(userId, amount, planName) {
             }
         };
 
-        console.log(`📡 Creating ${CONFIG.CASHFREE_MODE} Payment Link for User ${userId}...`);
-
         const response = await fetch(baseUrl, {
             method: 'POST',
             headers: {
@@ -53,18 +49,27 @@ export async function createPaymentLink(userId, amount, planName) {
         
         if (!response.ok) {
             console.error("❌ Cashfree API Rejection:", data);
-            // Provide friendly error message based on common Cashfree issues
-            let msg = data.message || "Payment Gateway is busy.";
-            if (data.code === "unauthorized") msg = "Invalid App ID or Secret. Please check your Cashfree credentials.";
-            if (data.code === "authentication_failure") msg = "Authentication failed. Check if you are using PROD keys in TEST mode.";
             
-            return { success: false, error: msg };
+            globalStats.lastPaymentError = data.message || data.code;
+            globalStats.lastRawError = data; // Save the full object
+            
+            if (data.type === 'feature_not_enabled' || data.code === 'feature_not_enabled' || (data.message && data.message.includes('not enabled'))) {
+                globalStats.isCashfreeApproved = false;
+                return { 
+                    success: false, 
+                    error_type: 'FEATURE_DISABLED',
+                    error: data.message || "Feature not enabled."
+                };
+            }
+
+            return { success: false, error: data.message || "Payment Gateway Error." };
         }
 
-        console.log(`✅ Payment Link Created Successfully: ${data.link_url}`);
+        globalStats.isCashfreeApproved = true;
+        globalStats.lastPaymentError = null;
+        globalStats.lastRawError = null;
         return { success: true, url: data.link_url };
     } catch (e) { 
-        console.error("❌ Network Error while calling Cashfree:", e.message);
-        return { success: false, error: "Network Error. Please try again later." }; 
+        return { success: false, error: "Network Error. Please try again." }; 
     }
 }

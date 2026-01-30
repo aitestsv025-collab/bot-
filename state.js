@@ -7,8 +7,22 @@ export const globalStats = {
     totalTransactions: 0,
     privatePhotosSent: 0,
     startTime: new Date(),
-    totalUsers: 0
+    totalUsers: 0,
+    lastPaymentError: null, 
+    lastRawError: null,
+    isCashfreeApproved: true,
+    logs: [] // Real-time activity logs
 };
+
+export function addLog(message, type = 'info') {
+    const log = {
+        time: new Date().toLocaleTimeString(),
+        message,
+        type
+    };
+    globalStats.logs.unshift(log);
+    if (globalStats.logs.length > 50) globalStats.logs.pop();
+}
 
 const NAMES = [
     "Riya", "Priya", "Sneha", "Ishani", "Kavya", "Ananya", "Sonia", "Meera", 
