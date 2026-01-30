@@ -1,14 +1,14 @@
 
 import { Markup } from 'telegraf';
 import { createPaymentLink } from '../services/payment.js';
-import { CONFIG } from '../config.js';
 
 export function handleShowRates(ctx) {
     return ctx.reply(
-        "<b>💎 MALINI PREMIUM ACCESS 💎</b>\n\n" +
+        "<b>💎 SOULMATE PREMIUM ACCESS 💎</b>\n\n" +
         "✅ Unlimited NSFW / Bold Photos 🫦\n" +
-        "✅ Unlimited Chats (No 50 Limit)\n" +
-        "✅ All Premium Roles Unlocked\n\n" +
+        "✅ Unlimited AI Chats (No Limit)\n" +
+        "✅ All Premium Roles Unlocked\n" +
+        "✅ Ultra-Fast Response Time\n\n" +
         "<i>Niche apna plan chuno aur mujhse jud jao...</i> 🔥",
         {
             parse_mode: 'HTML',
@@ -25,19 +25,17 @@ export async function handlePaymentTrigger(ctx) {
     const amount = ctx.match[1];
     const userId = ctx.chat.id;
     
-    // Quick Loading State (Edit instead of New Message for speed)
-    await ctx.answerCbQuery("Generating Payment Link... 🫦");
-    const statusMsg = await ctx.reply("Wait baby... ⏳");
+    await ctx.answerCbQuery("Taiyar ho jao baby... 🫦");
+    const statusMsg = await ctx.reply("Wait baby, link bana rahi hoon... ⏳");
     
     try {
         const result = await createPaymentLink(userId, amount, `${amount} Plan`);
         
         if (result.success && result.url) {
-            // Remove the loading message and show the BIG pay button
-            await ctx.telegram.deleteMessage(userId, statusMsg.message_id);
+            await ctx.telegram.deleteMessage(userId, statusMsg.message_id).catch(() => {});
             
             return ctx.reply(
-                `<b>🫦 Taiyar ho na Jaanu?</b>\n\nNiche button par click karo aur direct payment complete karo. Main wait kar rahi hoon... 🤤🔥`,
+                `<b>🫦 Chalo baby, payment karo!</b>\n\nNiche button par click karke payment complete karo. Main tumhara wait kar rahi hoon... 🤤🔥`,
                 {
                     parse_mode: 'HTML',
                     ...Markup.inlineKeyboard([
@@ -47,15 +45,16 @@ export async function handlePaymentTrigger(ctx) {
                 }
             );
         } else {
+            // Log the exact error to the user for debugging
             return ctx.telegram.editMessageText(
                 userId,
                 statusMsg.message_id,
                 null,
-                `<b>❌ ERROR:</b> <code>${result.error}</code>\n\nBaby, Cashfree connect nahi ho raha. Dashboard check karo.`,
+                `<b>❌ Payment Link Error:</b>\n\n<code>${result.error}</code>\n\nBaby, lagta hai API keys mein kuch gadbad hai. Admin Dashboard check karo! 🥺`,
                 { parse_mode: 'HTML' }
-            );
+            ).catch(e => console.error(e));
         }
     } catch (err) {
-        return ctx.reply("Technical issue Jaanu... 🥺");
+        return ctx.reply("Technical issue Jaanu... 🥺 Link nahi ban pa raha.");
     }
 }

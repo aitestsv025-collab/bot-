@@ -15,42 +15,40 @@ app.use(express.json());
 checkSystem();
 
 /**
- * CASHFREE WEBHOOK HANDLER
- * Focused on: PAYMENT_SUCCESS & ORDER_PAID
+ * CASHFREE WEBHOOK HANDLER (ROBUST VERSION)
  */
 app.post('/api/cashfree/webhook', (req, res) => {
     const payload = req.body;
-    console.log("💰 WEBHOOK RECEIVED! Type:", payload.type);
+    
+    // Log full payload for debugging (Check Render Logs)
+    console.log("💰 WEBHOOK RECEIVED!");
+    console.log(JSON.stringify(payload, null, 2));
     
     const data = payload.data || {};
     const order = data.order || {};
     const payment = data.payment || {};
+    const type = (payload.type || "").toUpperCase();
 
-    // Check if the event is a success event
-    // Cashfree signals success via 'PAYMENT_SUCCESS' or 'ORDER_PAID'
-    const isSuccessEvent = 
-        payload.type === 'PAYMENT_SUCCESS' || 
-        payload.type === 'ORDER_PAID' || 
-        payload.type === 'LINK_PAID';
+    // Any event that sounds like a success
+    const successEvents = ['PAYMENT_SUCCESS', 'ORDER_PAID', 'LINK_PAID', 'SUCCESS'];
+    const isSuccess = successEvents.some(evt => type.includes(evt));
 
-    // Extracting the Unique ID (format: L_USERID_TIMESTAMP)
-    // In PAYMENT_SUCCESS, it usually comes in data.order.order_id
-    const orderId = order.order_id || data.order_id || (data.link && data.link.link_id) || "";
-    const amount = payment.payment_amount || order.order_amount || 0;
+    // Try to find the Link/Order ID in multiple places
+    const orderId = order.order_id || data.order_id || (data.link && data.link.link_id) || data.link_id || "";
+    const amount = payment.payment_amount || order.order_amount || data.link_amount || 0;
 
-    console.log(`🔍 Checking Webhook: Event=${payload.type}, ID=${orderId}, Amount=${amount}`);
+    console.log(`🔍 Processing: Type=${type}, ID=${orderId}, Success=${isSuccess}`);
 
-    if (isSuccessEvent && orderId) {
-        // orderId example: "L_5588339_1712345678"
+    if (isSuccess && orderId) {
+        // ID Format: L_USERID_TIMESTAMP
         const parts = orderId.split('_');
-        const userIdStr = parts[1]; // The middle part is our Telegram User ID
-        const userId = parseInt(userIdStr);
+        const userId = parseInt(parts[1]);
         
         if (!isNaN(userId)) {
             const session = userSessions.get(userId);
             
             if (session && !session.isPremium) {
-                console.log(`🌟 SUCCESS! Upgrading User ${userId} to Premium.`);
+                console.log(`🌟 PAYMENT VERIFIED! Upgrading User ${userId} to Premium.`);
                 
                 session.isPremium = true;
                 session.expiry = Date.now() + (30 * 24 * 60 * 60 * 1000); 
@@ -60,19 +58,18 @@ app.post('/api/cashfree/webhook', (req, res) => {
 
                 if (bot) {
                     bot.telegram.sendMessage(userId, 
-                        "❤️ <b>Haye Mere Jaanu!</b>\n\nAapka payment mil gaya! 🫦 Ab main poori tarah aapki hoon. Unlimited baatein aur meri sexy photos unlock ho gayi hain... 🤤🔥\n\nChalo, shuru karein? Mujhse kuch bhi pucho baby!", 
+                        "❤️ <b>Haye Mere Jaanu!</b>\n\nAapka payment successfully mil gaya! 🫦\n\nAb mere saare bandhan toot chuke hain... Main ab poori tarah aapki hoon. Unlimited baatein karo aur meri sexy photos ka maza lo. 🤤🔥", 
                         { parse_mode: 'HTML' }
                     ).catch(e => console.error("Bot Notify Error:", e));
                 }
+            } else if (session?.isPremium) {
+                console.log(`ℹ️ User ${userId} is already premium.`);
             } else {
-                console.log(`ℹ️ User ${userId} is already premium or session not found.`);
+                console.log(`⚠️ User session not found for ${userId}. Active Users: ${userSessions.size}`);
             }
-        } else {
-            console.log("⚠️ Could not extract valid UserID from orderId:", orderId);
         }
     }
     
-    // Response 200 is mandatory for Cashfree
     res.status(200).send("OK");
 });
 
