@@ -1,13 +1,10 @@
+
 import { CONFIG } from "../config.js";
 
 export async function createPaymentLink(userId, amount, planName) {
     if (!CONFIG.CASHFREE_APP_ID || !CONFIG.CASHFREE_SECRET) {
         console.error("❌ PAYMENT ERROR: Missing Cashfree Credentials.");
-        console.error("Current Config Status:", { 
-            id: CONFIG.CASHFREE_APP_ID ? 'Set' : 'MISSING', 
-            secret: CONFIG.CASHFREE_SECRET ? 'Set' : 'MISSING' 
-        });
-        return null;
+        return { success: false, error: "Credentials Missing in Render Settings" };
     }
 
     const isProd = CONFIG.CASHFREE_MODE === "PROD";
@@ -48,14 +45,15 @@ export async function createPaymentLink(userId, amount, planName) {
         const data = await response.json();
         
         if (!response.ok) {
+            const errMsg = data.message || data.err_message || "Unknown Rejection";
             console.error("❌ Cashfree API Rejection:", JSON.stringify(data));
-            return null;
+            return { success: false, error: errMsg };
         }
 
         console.log(`✅ Link Generated: ${data.link_url}`);
-        return data.link_url;
+        return { success: true, url: data.link_url };
     } catch (e) { 
         console.error("❌ Cashfree Connection Error:", e.message);
-        return null; 
+        return { success: false, error: "Connection Failed: " + e.message }; 
     }
 }

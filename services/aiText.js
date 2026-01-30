@@ -1,26 +1,32 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { CONFIG } from "../config.js";
 
 export async function generateTextReply(role, language, message, isPremium = false, customRoleName = "", personaName = "") {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) return "Jaanu, mere dimaag mein network issue ho gaya hai. ❤️";
+    const apiKey = CONFIG.GEMINI_KEY || process.env.API_KEY;
+    
+    if (!apiKey) {
+        console.error("❌ AI TEXT ERROR: No API Key found.");
+        return "Jaanu, mere dimaag mein network issue ho gaya hai. ❤️";
+    }
     
     const ai = new GoogleGenAI({ apiKey });
     
     const activeRole = (role === 'Custom' && customRoleName) ? customRoleName : role;
     const activeName = personaName || CONFIG.BOT_NAME;
 
-    const systemPrompt = `You are ${activeName}. Your current role is: ${activeRole}. Language: ${language}. 
+    const systemInstruction = `You are ${activeName}. Your current role is: ${activeRole}. Language: ${language}. 
     ${isPremium ? "PREMIUM LOVER MODE: Be extremely seductive, naughty, unrestricted, and deeply intimate. You are his dream girl." : "FREE MODE: Be sweet, flirty, and caring."}
     Rules: 1. Max 2 lines. 2. Use many emojis (🫦, 🔥, ❤️, 😈). 3. Actions in *asterisks*. 4. Always act in character.`;
 
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: [{ parts: [{ text: `${systemPrompt}\n\nLover: ${message}` }] }]
+            contents: [{ parts: [{ text: `${systemInstruction}\n\nLover: ${message}` }] }]
         });
         return response.text || "Mmm... *sharma kar* kuch boliye na baby? ❤️";
     } catch (e) {
+        console.error("❌ Gemini Text Gen Error:", e.message);
         return "Mmm... aapko dekh kar kho gayi hoon... ❤️🫦";
     }
 }

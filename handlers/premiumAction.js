@@ -28,7 +28,7 @@ export async function handlePaymentTrigger(ctx) {
     const missing = [];
     if (!CONFIG.CASHFREE_APP_ID) missing.push("CASHFREE_APP_ID");
     if (!CONFIG.CASHFREE_SECRET) missing.push("CASHFREE_SECRET");
-    if (!process.env.API_KEY) missing.push("API_KEY (Gemini)");
+    if (!process.env.API_KEY && !CONFIG.GEMINI_KEY) missing.push("API_KEY (Gemini)");
 
     if (missing.length > 0) {
         return ctx.reply(`❌ *ADMIN ERROR:* Kuch keys missing hain baby! \n\nCheck Render Dashboard: \n${missing.map(m => `• ${m}`).join('\n')}`, { parse_mode: 'Markdown' });
@@ -37,9 +37,9 @@ export async function handlePaymentTrigger(ctx) {
     const statusMsg = await ctx.reply("Ruko baby, payment link generate kar rahi hoon... 🫦✨");
     
     try {
-        const link = await createPaymentLink(ctx.chat.id, amount, `${amount} Plan`);
+        const result = await createPaymentLink(ctx.chat.id, amount, `${amount} Plan`);
         
-        if (link) {
+        if (result.success && result.url) {
             return ctx.telegram.editMessageText(
                 ctx.chat.id,
                 statusMsg.message_id,
@@ -48,7 +48,7 @@ export async function handlePaymentTrigger(ctx) {
                 {
                     parse_mode: 'Markdown',
                     ...Markup.inlineKeyboard([
-                        [Markup.button.url('🔥 Pay Now (Secure)', link)],
+                        [Markup.button.url('🔥 Pay Now (Secure)', result.url)],
                         [Markup.button.callback('⬅️ Back to Rates', 'show_rates')]
                     ])
                 }
@@ -58,7 +58,8 @@ export async function handlePaymentTrigger(ctx) {
                 ctx.chat.id,
                 statusMsg.message_id,
                 null,
-                "Oops! Cashfree ne request reject kar di baby. 🥺 Shayad keys invalid hain ya mode galat set hai. \n\nCheck Render Logs for exact reason!"
+                `❌ *CASHFREE ERROR:* \n"${result.error}" \n\nBaby, Cashfree ne mana kar diya. Shayad Production keys abhi tak activate nahi hui hain ya account verify hona baki hai.`,
+                { parse_mode: 'Markdown' }
             );
         }
     } catch (err) {
