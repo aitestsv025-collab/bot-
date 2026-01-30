@@ -12,16 +12,19 @@ import { processIncomingMessage } from './handlers/messageProcessor.js';
 export const bot = CONFIG.TELEGRAM_TOKEN ? new Telegraf(CONFIG.TELEGRAM_TOKEN) : null;
 
 if (bot) {
-    // 1. Diagnostics Command (Fixed with HTML)
+    // 1. Production Diagnostics Command
     bot.command('status', (ctx) => {
+        const modeEmoji = CONFIG.CASHFREE_MODE === 'PROD' ? '💎' : '🧪';
+        const modeText = CONFIG.CASHFREE_MODE === 'PROD' ? 'PRODUCTION (Real Payments)' : 'SANDBOX (Test Mode)';
+        
         const status = [
-            "<b>🛠 BOT DIAGNOSTICS 🛠</b>",
-            `• Bot Token: ${CONFIG.TELEGRAM_TOKEN ? '✅ Found' : '❌ Missing'}`,
-            `• Gemini Key: ${CONFIG.GEMINI_KEY ? '✅ Found' : '❌ Missing'}`,
-            `• Cashfree ID: ${CONFIG.CASHFREE_APP_ID ? '✅ Found' : '❌ Missing'}`,
-            `• Cashfree Secret: ${CONFIG.CASHFREE_SECRET ? '✅ Found' : '❌ Missing'}`,
-            `• Server URL: <code>${CONFIG.HOST}</code>`,
-            "\n<b>Note:</b> Agar koi ❌ hai, to Render settings mein key check karein baby! ❤️"
+            "<b>🚀 BOT LIVE STATUS 🚀</b>",
+            `• Mode: ${modeEmoji} <b>${modeText}</b>`,
+            `• Bot Token: ${CONFIG.TELEGRAM_TOKEN ? '✅' : '❌'}`,
+            `• Gemini AI: ${CONFIG.GEMINI_KEY ? '✅' : '❌'}`,
+            `• Cashfree: ${CONFIG.CASHFREE_APP_ID ? '✅' : '❌'}`,
+            `• Webhook: <code>${CONFIG.HOST}/api/cashfree/webhook</code>`,
+            "\n<i>Note: Everything must be ✅ for real payments to work.</i>"
         ].join('\n');
         return ctx.reply(status, { parse_mode: 'HTML' });
     });

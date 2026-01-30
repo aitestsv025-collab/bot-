@@ -1,42 +1,37 @@
 
-// Super robust environment loader
-const getEnv = (possibleNames) => {
-    // 1. Try exact matches first
+// Super robust environment loader for Production
+const getEnv = (possibleNames, defaultValue = "") => {
     for (const name of possibleNames) {
         const val = process.env[name];
-        if (val && val.trim().length > 5) return val.trim().replace(/['"]/g, '');
-    }
-    
-    // 2. Try case-insensitive search if still not found
-    const allKeys = Object.keys(process.env);
-    for (const name of possibleNames) {
-        const foundKey = allKeys.find(k => k.toUpperCase() === name.toUpperCase());
-        if (foundKey) {
-            const val = process.env[foundKey];
-            if (val && val.trim().length > 5) return val.trim().replace(/['"]/g, '');
+        if (val && val.trim().length > 0) {
+            // Remove any accidental quotes or spaces
+            return val.trim().replace(/['"]/g, '');
         }
     }
-    return "";
+    return defaultValue;
 };
 
 export const CONFIG = {
-    TELEGRAM_TOKEN: getEnv(['TELEGRAM_TOKEN', 'BOT_TOKEN', 'TOKEN']),
-    GEMINI_KEY: getEnv(['GEMINI_KEY', 'API_KEY', 'GEMINI_API_KEY']),
-    CASHFREE_APP_ID: getEnv(['CASHFREE_APP_ID', 'CASH_APP_ID', 'CASHFREE_ID']),
-    CASHFREE_SECRET: getEnv(['CASHFREE_SECRET', 'CASH_SECRET', 'CASHFREE_KEY']),
-    CASHFREE_MODE: (process.env.CASHFREE_MODE || "PROD").toUpperCase(),
+    TELEGRAM_TOKEN: getEnv(['TELEGRAM_TOKEN', 'BOT_TOKEN']),
+    GEMINI_KEY: getEnv(['GEMINI_KEY', 'API_KEY']),
+    CASHFREE_APP_ID: getEnv(['CASHFREE_APP_ID']),
+    CASHFREE_SECRET: getEnv(['CASHFREE_SECRET']),
+    // Defaulting strictly to PROD for real payments
+    CASHFREE_MODE: (process.env.CASHFREE_MODE || "PROD").toUpperCase().trim(),
     FREE_MESSAGE_LIMIT: 50,
     BOT_NAME: "Malini",
+    // Ensure host doesn't have trailing slash
     HOST: (process.env.RENDER_EXTERNAL_URL || `https://${process.env.RENDER_EXTERNAL_HOSTNAME}` || 'http://localhost:10000').replace(/\/$/, '')
 };
 
 export function checkSystem() {
-    console.log("-----------------------------------------");
-    console.log("🔍 SYSTEM STATUS CHECK:");
-    console.log(`- Bot Token: ${CONFIG.TELEGRAM_TOKEN ? '✅ LOADED' : '❌ MISSING'}`);
-    console.log(`- Gemini Key: ${CONFIG.GEMINI_KEY ? '✅ LOADED' : '❌ MISSING'}`);
-    console.log(`- Cashfree ID: ${CONFIG.CASHFREE_APP_ID ? '✅ LOADED' : '❌ MISSING'}`);
-    console.log(`- Host: ${CONFIG.HOST}`);
-    console.log("Available Process Keys:", Object.keys(process.env).filter(k => k.includes('CASH') || k.includes('KEY') || k.includes('TOKEN')));
-    console.log("-----------------------------------------");
+    console.log("=========================================");
+    console.log("🚀 PRODUCTION SYSTEM STARTUP");
+    console.log(`- Bot Name: ${CONFIG.BOT_NAME}`);
+    console.log(`- Mode: ${CONFIG.CASHFREE_MODE === 'PROD' ? '💎 PRODUCTION' : '🧪 SANDBOX'}`);
+    console.log(`- Telegram: ${CONFIG.TELEGRAM_TOKEN ? '✅ READY' : '❌ MISSING'}`);
+    console.log(`- Gemini AI: ${CONFIG.GEMINI_KEY ? '✅ READY' : '❌ MISSING'}`);
+    console.log(`- Cashfree: ${CONFIG.CASHFREE_APP_ID ? '✅ READY' : '❌ MISSING'}`);
+    console.log(`- Webhook URL: ${CONFIG.HOST}/api/cashfree/webhook`);
+    console.log("=========================================");
 }
