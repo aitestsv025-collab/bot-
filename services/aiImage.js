@@ -2,7 +2,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { CONFIG } from "../config.js";
 
-// Positions mapping for intelligent selection (used for Bold/NSFW fallback/pool)
 const CATEGORIES = {
     STANDING: ["https://ibb.co/SDJ02zVn", "https://ibb.co/6ccNJsrR", "https://ibb.co/bgKjw6ZV", "https://ibb.co/YB2FMYgf", "https://ibb.co/Gwr4zX6", "https://ibb.co/FqDs9c8c", "https://ibb.co/DHPqjzPb", "https://ibb.co/gZjPMg37", "https://ibb.co/nTyrM2L", "https://ibb.co/23mWdFHJ", "https://ibb.co/bgV8Sx0H", "https://ibb.co/9kk9xnYN", "https://ibb.co/PGGycbV3", "https://ibb.co/Pzmt6sVK", "https://ibb.co/wFzK5HFC", "https://ibb.co/B5d8XgKP", "https://ibb.co/ch3ckg2t", "https://ibb.co/ksrcqW2f", "https://ibb.co/bRJC9sH3", "https://ibb.co/k274SfSh", "https://ibb.co/RTW5ZnH6", "https://ibb.co/CsQKTSMp", "https://ibb.co/Q7KZXyTv"],
     BED: ["https://ibb.co/9mBzn1Hd", "https://ibb.co/39qw35kN", "https://ibb.co/xnNxwNJ", "https://ibb.co/svKHk73V", "https://ibb.co/4ZMQRwqz", "https://ibb.co/s9bDqNqQ", "https://ibb.co/PzWzMF0C", "https://ibb.co/YB2FMYgf", "https://ibb.co/JWPrcN8x", "https://ibb.co/SXcqdq4h", "https://ibb.co/vxH7LT0K", "https://ibb.co/WdV7ztX", "https://ibb.co/jZz2fp3H", "https://ibb.co/Qjf649QL", "https://ibb.co/3Y4kTVpS", "https://ibb.co/zHQSVxdz", "https://ibb.co/27tb8N7S", "https://ibb.co/HfgGg33G", "https://ibb.co/Kc9Fs4hZ", "https://ibb.co/ksLXdXzg", "https://ibb.co/S4Ch21gs", "https://ibb.co/dwcNPjs5", "https://ibb.co/ycVxw3JF", "https://ibb.co/zTWKHjpk", "https://ibb.co/HpLbZfqW", "https://ibb.co/ZzcMkz9v", "https://ibb.co/yCcZXSq", "https://ibb.co/Dfht84W3"],
@@ -15,88 +14,59 @@ const BOLD_AUNTY = ["https://ibb.co/Pzmt6sVK", "https://ibb.co/Kc9Fs4hZ", "https
 
 const FREE_SAMPLES = ["https://ibb.co/SDJ02zVn", "https://ibb.co/Pzmt6sVK"];
 
-export async function generateGFImage(isBold = false, isPremium = false, role = 'Romantic', userText = "") {
+export async function generateGFImage(isBold = false, isPremium = false, role = 'Girlfriend', userText = "", customAge = null) {
     if (isBold) {
-        if (!isPremium) {
-            return FREE_SAMPLES[Math.floor(Math.random() * FREE_SAMPLES.length)];
-        }
-
+        if (!isPremium) return FREE_SAMPLES[Math.floor(Math.random() * FREE_SAMPLES.length)];
         const lowerText = userText.toLowerCase();
         let targetPool = [];
+        if (lowerText.match(/(bend|jhuk|back|doggy|behind|piche)/)) targetPool = CATEGORIES.BENT;
+        else if (lowerText.match(/(bed|let|sofa|sleep|lay)/)) targetPool = CATEGORIES.BED;
+        else if (lowerText.match(/(stand|khadi|khade)/)) targetPool = CATEGORIES.STANDING;
+        else if (lowerText.match(/(sit|baith|chair)/)) targetPool = CATEGORIES.SITTING;
 
-        // Position Detection
-        if (lowerText.match(/(bend|jhuk|back|doggy|behind|piche)/)) {
-            targetPool = CATEGORIES.BENT;
-        } else if (lowerText.match(/(bed|let|sofa|sleep|lay)/)) {
-            targetPool = CATEGORIES.BED;
-        } else if (lowerText.match(/(stand|khadi|khade)/)) {
-            targetPool = CATEGORIES.STANDING;
-        } else if (lowerText.match(/(sit|baith|chair)/)) {
-            targetPool = CATEGORIES.SITTING;
-        }
-
-        if (targetPool.length === 0) {
-            const isAuntyRole = ['Stepmom', 'Teacher'].includes(role);
-            targetPool = isAuntyRole ? BOLD_AUNTY : BOLD_YOUNG;
-        } else {
-            const isAuntyRole = ['Stepmom', 'Teacher'].includes(role);
+        const isAuntyRole = ['Aunty', 'Stepmom', 'Boss'].includes(role);
+        if (targetPool.length === 0) targetPool = isAuntyRole ? BOLD_AUNTY : BOLD_YOUNG;
+        else {
             if (isAuntyRole) {
-                const auntyMatches = targetPool.filter(url => BOLD_AUNTY.includes(url));
-                if (auntyMatches.length > 0) targetPool = auntyMatches;
+                const matches = targetPool.filter(url => BOLD_AUNTY.includes(url));
+                if (matches.length > 0) targetPool = matches;
             } else {
-                const youngMatches = targetPool.filter(url => BOLD_YOUNG.includes(url));
-                if (youngMatches.length > 0) targetPool = youngMatches;
+                const matches = targetPool.filter(url => BOLD_YOUNG.includes(url));
+                if (matches.length > 0) targetPool = matches;
             }
         }
-        
         return targetPool[Math.floor(Math.random() * targetPool.length)];
     } else {
-        const apiKey = CONFIG.GEMINI_KEY;
-        if (!apiKey) return null;
+        if (!CONFIG.GEMINI_KEY) return null;
+        const ai = new GoogleGenAI({ apiKey: CONFIG.GEMINI_KEY });
+        let desc = "";
+        let age = customAge;
 
-        const ai = new GoogleGenAI({ apiKey });
-        
-        // --- AGE & ROLE SPECIFIC PROMPT LOGIC ---
-        let profileDescription = "";
         switch(role) {
-            case 'Romantic':
-                profileDescription = "A stunningly beautiful 18-year-old Indian girl, innocent smile, cute casual clothes like a tank top, natural makeup, long straight hair, outdoor sunlight, very realistic.";
-                break;
-            case 'Naughty':
-                profileDescription = "A playful and seductive 21-year-old Indian girl, modern trendy crop top, messy hair, winking at camera, dim bedroom lighting, highly realistic skin.";
-                break;
-            case 'Teacher':
-                profileDescription = "A gorgeous 27-year-old Indian woman as a teacher, wearing an elegant chiffon saree, spectacles, holding a book, professional yet attractive look, classroom background.";
-                break;
-            case 'Secretary':
-                profileDescription = "A sexy 24-year-old Indian secretary, wearing a white formal shirt and black pencil skirt, professional look, modern office interior, high quality photo.";
-                break;
-            case 'Boss':
-                profileDescription = "A sophisticated 32-year-old Indian female boss, wearing a luxurious business suit, confident posture, executive office setting, sharp features.";
-                break;
-            case 'Stepmom':
-                profileDescription = "A mature and elegant 38-year-old Indian woman, wearing a heavy silk saree, sophisticated traditional jewelry, gracefully sitting, warm home interior.";
-                break;
-            default:
-                profileDescription = `A beautiful young Indian woman in ${role} style, realistic portrait, 8k resolution, cinematic lighting.`;
+            case 'Girlfriend': desc = "A stunning 18-year-old Indian girl, cute look, casual tank top, long hair."; age = 18; break;
+            case 'Bestfriend': desc = "A playful 18-year-old Indian bestie, wearing a crop top and jeans, laughing."; age = 18; break;
+            case 'Teacher': desc = "A beautiful 25-year-old Indian teacher in a soft chiffon saree, spectacles."; age = 25; break;
+            case 'College': desc = "A 20-year-old Indian college girl, trendy outfit, campus background."; age = 20; break;
+            case 'Aunty': desc = "A curvy and beautiful 34-year-old Indian woman in a traditional saree."; age = 34; break;
+            case 'Boss': desc = "A powerful 31-year-old Indian female boss in a formal white shirt."; age = 31; break;
+            case 'Stepmom': desc = "An elegant 42-year-old Indian woman, mature and sophisticated features."; age = 42; break;
+            case 'Stepsister': desc = "A naughty 19-year-old Indian stepsister, casual home clothes."; age = 19; break;
+            case 'Custom': desc = `A beautiful Indian woman acting as a custom role, age ${age || 18}, realistic.`; break;
+            default: desc = "A beautiful Indian woman, realistic portrait."; break;
         }
 
-        const prompt = `${profileDescription} Cinematic highly realistic 8k photo, hyper-realistic skin texture, detailed eyes, masterwork quality.`;
-
+        const prompt = `${desc} Cinematic 8k realistic photo, detailed skin and eyes, high quality.`;
         try {
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash-image',
                 contents: { parts: [{ text: prompt }] },
                 config: { imageConfig: { aspectRatio: "9:16" } }
             });
-
             const candidate = response.candidates?.[0];
             if (candidate) {
-                for (const part of candidate.content.parts) {
-                    if (part.inlineData) return Buffer.from(part.inlineData.data, 'base64');
-                }
+                for (const part of candidate.content.parts) if (part.inlineData) return Buffer.from(part.inlineData.data, 'base64');
             }
-        } catch (e) { console.error("AI Normal Image Gen Error:", e); }
+        } catch (e) {}
         return BOLD_YOUNG[0];
     }
 }

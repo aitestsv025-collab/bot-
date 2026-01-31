@@ -3,6 +3,8 @@ import { Markup } from 'telegraf';
 import { createPaymentLink } from '../services/payment.js';
 
 export function handleShowRates(ctx) {
+    try { ctx.answerCbQuery().catch(() => {}); } catch(e) {}
+    
     return ctx.reply(
         "<b>💎 SOULMATE PREMIUM ACCESS 💎</b>\n\n" +
         "✅ Unlimited NSFW / Bold Photos 🫦\n" +
@@ -18,14 +20,14 @@ export function handleShowRates(ctx) {
                 [Markup.button.callback('₹299 - 1 Month (Full Maza)', 'pay_299')]
             ])
         }
-    );
+    ).catch(e => console.log("Show Rates Error:", e.message));
 }
 
 export async function handlePaymentTrigger(ctx) {
+    try { await ctx.answerCbQuery("Taiyar ho jao baby... 🫦").catch(() => {}); } catch(e) {}
+    
     const amount = ctx.match[1];
     const userId = ctx.chat.id;
-    
-    await ctx.answerCbQuery("Taiyar ho jao baby... 🫦");
     const statusMsg = await ctx.reply("Wait baby, link bana rahi hoon... ⏳");
     
     try {

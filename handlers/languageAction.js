@@ -1,27 +1,38 @@
 
-import { userSessions } from '../state.js';
-import { getPersistentMarkup, getRoleKeyboard } from '../utils/markups.js';
+import { userSessions, isPremiumUser } from '../state.js';
+import { getRoleKeyboard } from '../utils/markups.js';
+import { Markup } from 'telegraf';
+import { CONFIG } from '../config.js';
 
 export async function handleLanguageSelection(ctx) {
+    try { await ctx.answerCbQuery().catch(() => {}); } catch(e) {}
+
+    const userId = ctx.chat.id;
+    const session = userSessions.get(userId);
+    if (!session) return;
+
+    // Protection against clever users trying to re-select language after limit
+    if (!isPremiumUser(userId) && (session.messageCount || 0) >= CONFIG.FREE_MESSAGE_LIMIT) {
+        return ctx.reply("❌ Baby, aapki limit khatam ho chuki hai. Premium join karo na? 🫦");
+    }
+
     const lang = ctx.match[1];
-    const session = userSessions.get(ctx.chat.id);
-    if (session) session.language = lang;
+    session.language = lang;
     
-    await ctx.answerCbQuery(`${lang} Selected! ❤️`);
-    
-    // Confirmation message based on language or generic Hinglish with translation hint
     const confirmationText = {
-        'Hindi': 'ठीक है जानू, अब मैं हिंदी में बात करूँगी। ❤️\n\nअब बताओ मैं आज तुम्हारे लिए क्या बनूँ? 🫦',
-        'Tamil': 'சரி அன்பே, இனி நான் தமிழில் பேசுவேன். ❤️\n\nஇன்று நான் உனக்காக என்னவாக இருக்க வேண்டும் என்று சொல்? 🫦',
-        'Telugu': 'సరే ప్రియుడా, ఇకపై నేను తెలుగులో మాట్లాడతాను. ❤️\n\nఈరోజు నేను నీకోసం ఏం కావాలో చెప్పు? 🫦',
-        'English': 'Alright darling, I will speak in English now. ❤️\n\nNow tell me, what should I be for you today? 🫦',
-        'Hinglish': 'Uff... *muskurate hue* bahut achi choice hai baby.\n\nAb batao main aaj tumhare liye kya banoon? 🫦'
+        'Hindi': 'ठीक है जानू, अब मैं हिंदी में बात करूँगी। ❤️',
+        'Tamil': 'சரி அன்பే, இனி நான் தமிழில் பேசுவேன். ❤️',
+        'Telugu': 'సరే ప్రియుడా, ఇకపై నేను తెలుగులో మాట్లాడతాను. ❤️',
+        'English': 'Alright darling, I will speak in English now. ❤️',
+        'Hinglish': 'Uff... *muskurate hue* bahut achi choice hai baby.'
     };
 
     const text = confirmationText[lang] || confirmationText['Hinglish'];
 
-    return ctx.editMessageText(
-        text,
-        getPersistentMarkup(ctx.chat.id, getRoleKeyboard(ctx.chat.id))
+    await ctx.editMessageText(`✅ <b>Language Set: ${lang}</b>\n${text}`, { parse_mode: 'HTML' }).catch(e => console.error(e));
+
+    return ctx.reply(
+        "Ab batao main aaj tumhare liye kya banoon? 🫦",
+        Markup.inlineKeyboard(getRoleKeyboard(ctx.chat.id))
     );
 }

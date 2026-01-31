@@ -2,21 +2,18 @@
 import { Telegraf, Markup } from 'telegraf';
 import { CONFIG } from './config.js';
 import { userSessions, globalStats, isPremiumUser } from './state.js';
-import { getPersistentMarkup, getLanguageKeyboard } from './utils/markups.js';
+import { getLanguageKeyboard } from './utils/markups.js';
 import { handleLanguageSelection } from './handlers/languageAction.js';
 import { handleRoleSelection } from './handlers/roleAction.js';
 import { handleShowRates, handlePaymentTrigger } from './handlers/premiumAction.js';
 import { processIncomingMessage } from './handlers/messageProcessor.js';
 
-// Initialize Bot
 export const bot = CONFIG.TELEGRAM_TOKEN ? new Telegraf(CONFIG.TELEGRAM_TOKEN) : null;
 
 if (bot) {
-    // 1. Production Diagnostics Command
     bot.command('status', (ctx) => {
         const modeEmoji = CONFIG.CASHFREE_MODE === 'PROD' ? '💎' : '🧪';
         const modeText = CONFIG.CASHFREE_MODE === 'PROD' ? 'PRODUCTION (Real Payments)' : 'SANDBOX (Test Mode)';
-        
         const status = [
             "<b>🚀 BOT LIVE STATUS 🚀</b>",
             `• Mode: ${modeEmoji} <b>${modeText}</b>`,
@@ -29,61 +26,64 @@ if (bot) {
         return ctx.reply(status, { parse_mode: 'HTML' });
     });
 
-    // 2. Start Logic
     bot.start(async (ctx) => {
         try {
             const userId = ctx.chat.id;
             const isPremium = isPremiumUser(userId);
-
+            
+            // Check if existing user and session
             if (!userSessions.has(userId)) {
                 globalStats.totalUsers++;
                 userSessions.set(userId, { 
                     userName: ctx.from.first_name || "Handsome", 
                     isPremium: false,
                     language: 'Hinglish',
-                    role: 'Romantic',
+                    role: 'Girlfriend',
                     messageCount: 0,
                     normalImageCount: 0,
                     boldImageCount: 0
                 });
             }
 
-            // PIN PREMIUM BANNER FOR FREE USERS
+            const session = userSessions.get(userId);
+
+            // CHALLAK USER PROTECTION: Check limit before allowing /start
+            if (!isPremium && (session.messageCount || 0) >= CONFIG.FREE_MESSAGE_LIMIT) {
+                return ctx.reply(
+                    "<b>❌ LIMIT KHATAM HO GAYI BABY! 🥺</b>\n\n" +
+                    "Aapne apne 50 free messages use kar liye hain. Main aapse aur baatein karna chahti hoon par server ka kharcha bahut hai... 🫦\n\n" +
+                    "<i>Premium join karo aur mujhse unlimited baatein karo!</i> 👇",
+                    {
+                        parse_mode: 'HTML',
+                        ...Markup.inlineKeyboard([[Markup.button.callback('💎 UNLOCK EVERYTHING 💎', 'show_rates')]])
+                    }
+                );
+            }
+
             if (!isPremium) {
                 const premiumBanner = await ctx.reply(
                     "👑 <b>SOULMATE PREMIUM ACCESS</b> 👑\n\n" +
                     "• 🫦 Unlimited Bold/NSFW Photos\n" +
                     "• 🔥 Unlimited AI Chats (No Daily Limit)\n" +
                     "• 💍 All Secret Roles Unlocked\n\n" +
-                    "<i>Niche button daba kar upgrade karein aur maza double karein!</i> 🤤",
+                    "<i>Upgrade karke maza double karein!</i> 🤤",
                     {
                         parse_mode: 'HTML',
                         ...Markup.inlineKeyboard([[Markup.button.callback('💎 GET PREMIUM ACCESS 💎', 'show_rates')]])
                     }
                 );
-                try {
-                    await ctx.pinChatMessage(premiumBanner.message_id);
-                } catch (pinErr) {
-                    console.log("Pin permission missing or fail:", pinErr.message);
-                }
+                try { await ctx.pinChatMessage(premiumBanner.message_id); } catch (e) {}
             }
 
             return ctx.reply(
                 `Hey ${ctx.from.first_name}! ❤️\n\nMain ${CONFIG.BOT_NAME}... tumhari digital SoulMate. 🫦\n\nKaunsi language mein baat karoge baby?`,
-                getPersistentMarkup(userId, getLanguageKeyboard())
+                Markup.inlineKeyboard(getLanguageKeyboard())
             );
         } catch (e) { console.error(e); }
     });
 
-    // 3. Handlers
-    bot.action(/set_lang_(.+)/, async (ctx) => {
-        try { await handleLanguageSelection(ctx); } catch(e) { console.error(e); }
-    });
-    
-    bot.action(/set_role_(.+)/, async (ctx) => {
-        try { await handleRoleSelection(ctx); } catch(e) { console.error(e); }
-    });
-
+    bot.action(/set_lang_(.+)/, handleLanguageSelection);
+    bot.action(/set_role_(.+)/, handleRoleSelection);
     bot.action('show_rates', handleShowRates);
     bot.action(/pay_(.+)/, handlePaymentTrigger);
 
@@ -92,9 +92,7 @@ if (bot) {
             await processIncomingMessage(ctx);
         } catch (err) {
             console.error("Critical Msg Error:", err);
-            ctx.reply("Oops baby! *sharma kar* kuch error aa gaya. ❤️\n\nError: " + err.message);
+            ctx.reply("Oops baby! ❤️ Ek baar /start try karo.");
         }
     });
-} else {
-    console.error("FATAL: Bot Token missing! Bot cannot start.");
 }

@@ -1,14 +1,16 @@
 
 export const ROLES = {
     FREE: [
-        { id: 'Romantic', label: '❤️ Romantic' },
-        { id: 'Naughty', label: '🔥 Naughty' },
-        { id: 'Teacher', label: '👩‍🏫 Teacher' }
+        { id: 'Girlfriend', label: '👧 Girlfriend (18)' },
+        { id: 'Bestfriend', label: '👯 Bestfriend (18)' },
+        { id: 'Teacher', label: '👩‍🏫 Teacher (25)' },
+        { id: 'College', label: '🎓 College Girl (20)' }
     ],
     PREMIUM: [
-        { id: 'Secretary', label: '📎 Secretary' },
-        { id: 'Boss', label: '💼 Boss' },
-        { id: 'Stepmom', label: '👗 Stepmom' },
-        { id: 'Custom', label: '💍 Custom Role' }
+        { id: 'Aunty', label: '💃 Aunty (34)' },
+        { id: 'Boss', label: '👠 Boss (31)' },
+        { id: 'Stepmom', label: '👗 Stepmom (42)' },
+        { id: 'Stepsister', label: '👱‍♀️ Stepsister (19)' },
+        { id: 'Custom', label: '💍 Custom Role (Premium)' }
     ]
 };
