@@ -11,28 +11,19 @@ export async function handleLanguageSelection(ctx) {
     const session = userSessions.get(userId);
     if (!session) return;
 
-    // Protection against clever users trying to re-select language after limit
     if (!isPremiumUser(userId) && (session.messageCount || 0) >= CONFIG.FREE_MESSAGE_LIMIT) {
-        return ctx.reply("❌ Baby, aapki limit khatam ho chuki hai. Premium join karo na? 🫦");
+        return ctx.reply("❌ Baby, limit khatam ho chuki hai.");
     }
 
     const lang = ctx.match[1];
     session.language = lang;
-    
-    const confirmationText = {
-        'Hindi': 'ठीक है जानू, अब मैं हिंदी में बात करूँगी। ❤️',
-        'Tamil': 'சரி அன்பే, இனி நான் தமிழில் பேசுவேன். ❤️',
-        'Telugu': 'సరే ప్రియుడా, ఇకపై నేను తెలుగులో మాట్లాడతాను. ❤️',
-        'English': 'Alright darling, I will speak in English now. ❤️',
-        'Hinglish': 'Uff... *muskurate hue* bahut achi choice hai baby.'
-    };
 
-    const text = confirmationText[lang] || confirmationText['Hinglish'];
-
-    await ctx.editMessageText(`✅ <b>Language Set: ${lang}</b>\n${text}`, { parse_mode: 'HTML' }).catch(e => console.error(e));
-
-    return ctx.reply(
-        "Ab batao main aaj tumhare liye kya banoon? 🫦",
-        Markup.inlineKeyboard(getRoleKeyboard(ctx.chat.id))
-    );
+    // EDIT the current message to show Roles instead of sending a new one
+    return ctx.editMessageText(
+        `✅ Language: <b>${lang}</b>\n\nAb batao main aaj tumhare liye kya banoon? 🫦`,
+        {
+            parse_mode: 'HTML',
+            ...Markup.inlineKeyboard(getRoleKeyboard(ctx.chat.id))
+        }
+    ).catch(e => console.error("Edit Lang Error:", e));
 }

@@ -31,7 +31,6 @@ if (bot) {
             const userId = ctx.chat.id;
             const isPremium = isPremiumUser(userId);
             
-            // Check if existing user and session
             if (!userSessions.has(userId)) {
                 globalStats.totalUsers++;
                 userSessions.set(userId, { 
@@ -47,36 +46,29 @@ if (bot) {
 
             const session = userSessions.get(userId);
 
-            // CHALLAK USER PROTECTION: Check limit before allowing /start
+            // Limit check
             if (!isPremium && (session.messageCount || 0) >= CONFIG.FREE_MESSAGE_LIMIT) {
                 return ctx.reply(
-                    "<b>❌ LIMIT KHATAM HO GAYI BABY! 🥺</b>\n\n" +
-                    "Aapne apne 50 free messages use kar liye hain. Main aapse aur baatein karna chahti hoon par server ka kharcha bahut hai... 🫦\n\n" +
-                    "<i>Premium join karo aur mujhse unlimited baatein karo!</i> 👇",
-                    {
-                        parse_mode: 'HTML',
-                        ...Markup.inlineKeyboard([[Markup.button.callback('💎 UNLOCK EVERYTHING 💎', 'show_rates')]])
-                    }
+                    "<b>❌ LIMIT KHATAM HO GAYI BABY! 🥺</b>\n\nAapki 50 messages ki free limit khatam ho chuki hai. Upgrade karein?",
+                    Markup.inlineKeyboard([[Markup.button.callback('💎 UNLOCK EVERYTHING 💎', 'show_rates')]])
                 );
             }
 
+            // Pin Premium Banner at the very start
             if (!isPremium) {
-                const premiumBanner = await ctx.reply(
-                    "👑 <b>SOULMATE PREMIUM ACCESS</b> 👑\n\n" +
-                    "• 🫦 Unlimited Bold/NSFW Photos\n" +
-                    "• 🔥 Unlimited AI Chats (No Daily Limit)\n" +
-                    "• 💍 All Secret Roles Unlocked\n\n" +
-                    "<i>Upgrade karke maza double karein!</i> 🤤",
+                const banner = await ctx.reply(
+                    "👑 <b>SOULMATE PREMIUM</b>\n• Unlimited Chats & Photos\n• All Secret Roles Unlocked",
                     {
                         parse_mode: 'HTML',
                         ...Markup.inlineKeyboard([[Markup.button.callback('💎 GET PREMIUM ACCESS 💎', 'show_rates')]])
                     }
                 );
-                try { await ctx.pinChatMessage(premiumBanner.message_id); } catch (e) {}
+                try { await ctx.pinChatMessage(banner.message_id); } catch (e) {}
             }
 
+            // Only show Language selection to keep it clean
             return ctx.reply(
-                `Hey ${ctx.from.first_name}! ❤️\n\nMain ${CONFIG.BOT_NAME}... tumhari digital SoulMate. 🫦\n\nKaunsi language mein baat karoge baby?`,
+                `Hey ${ctx.from.first_name}! ❤️ Kaunsi language mein baat karoge?`,
                 Markup.inlineKeyboard(getLanguageKeyboard())
             );
         } catch (e) { console.error(e); }
