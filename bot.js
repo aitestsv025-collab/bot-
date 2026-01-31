@@ -54,10 +54,10 @@ if (bot) {
                 );
             }
 
-            // Pin Premium Banner at the very start
+            // Pin Premium Banner silently at the start
             if (!isPremium) {
                 const banner = await ctx.reply(
-                    "👑 <b>SOULMATE PREMIUM</b>\n• Unlimited Chats & Photos\n• All Secret Roles Unlocked",
+                    "👑 <b>SOULMATE PREMIUM ACCESS</b>\n• Unlimited Chats & Photos\n• All Secret Roles Unlocked",
                     {
                         parse_mode: 'HTML',
                         ...Markup.inlineKeyboard([[Markup.button.callback('💎 GET PREMIUM ACCESS 💎', 'show_rates')]])
@@ -66,7 +66,7 @@ if (bot) {
                 try { await ctx.pinChatMessage(banner.message_id); } catch (e) {}
             }
 
-            // SHOW ROLES FIRST
+            // STEP 1: SHOW ROLES IMMEDIATELY
             return ctx.reply(
                 `Hey ${ctx.from.first_name}! ❤️ Main aaj tumhare liye kya banoon? 🫦`,
                 Markup.inlineKeyboard(getRoleKeyboard(ctx.chat.id))

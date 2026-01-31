@@ -13,29 +13,31 @@ export async function handleRoleSelection(ctx) {
     if (!session) return;
 
     if (!isPremiumUser(userId) && (session.messageCount || 0) >= CONFIG.FREE_MESSAGE_LIMIT) {
-        return ctx.reply("❌ Limit khatam baby.");
+        return ctx.reply("❌ Limit khatam baby. 🫦");
     }
 
     const isPremiumRole = ROLES.PREMIUM.some(r => r.id === roleId);
     if (isPremiumRole && !isPremiumUser(userId)) {
-        return ctx.reply("❌ Ye Role Premium hai baby! Join karo na?");
+        return ctx.reply("❌ Ye Role Premium hai baby! Join karo na? 🫦");
     }
 
     session.role = roleId;
 
     if (roleId === 'Custom') {
-        await ctx.editMessageText("💍 <b>Custom Persona Mode Active</b>", { parse_mode: 'HTML' }).catch(() => {});
+        await ctx.editMessageText("💍 <b>Custom Persona Mode</b>", { parse_mode: 'HTML' }).catch(() => {});
         session.awaitingCustomRole = true;
         session.customRoleStep = 'NAME';
         return ctx.reply(`Main wahi banungi jo tum bologe baby...\n\nPehle batao main aaj kya banoon? (Example: 'Pados wali bhabhi')`, { parse_mode: 'Markdown' });
     }
 
     const allRoles = [...ROLES.FREE, ...ROLES.PREMIUM];
-    const roleLabel = allRoles.find(r => r.id === roleId)?.label.split(' (')[0] || roleId;
+    // Strip emojis and age for cleaner role name in instruction
+    let roleLabel = allRoles.find(r => r.id === roleId)?.label || roleId;
+    roleLabel = roleLabel.replace(/[^\w\s]/gi, '').split('(')[0].trim();
 
-    // After Role selection, ask for Language using Role-specific text
+    // STEP 2: SHOW LANGUAGE with exact requested format
     return ctx.editMessageText(
-        `✅ Role Set: <b>${roleLabel}</b>\n\nSelect your <b>${roleLabel}</b> language baby... ❤️`,
+        `Select your <b>${roleLabel}</b> language baby... ❤️`,
         {
             parse_mode: 'HTML',
             ...Markup.inlineKeyboard(getLanguageKeyboard())

@@ -11,17 +11,17 @@ export async function handleLanguageSelection(ctx) {
     if (!session) return;
 
     if (!isPremiumUser(userId) && (session.messageCount || 0) >= CONFIG.FREE_MESSAGE_LIMIT) {
-        return ctx.reply("❌ Baby, limit khatam ho chuki hai.");
+        return ctx.reply("❌ Baby, limit khatam ho chuki hai. 🫦");
     }
 
     const lang = ctx.match[1];
     session.language = lang;
     session.personaName = getRandomName();
 
-    // 1. Edit current message to say it's ready (removes buttons)
-    await ctx.editMessageText(`✅ <b>Taiyar Hoon!</b>\nMain <b>${session.personaName}</b> ban gayi hoon. 🫦\n\nAb maza shuru karte hain...`, { parse_mode: 'HTML' }).catch(() => {});
+    // STEP 3: CLEAN COMPLETION
+    await ctx.editMessageText(`✅ <b>Taiyar Hoon!</b>\nMain <b>${session.personaName}</b> ban gayi hoon. 🫦`, { parse_mode: 'HTML' }).catch(() => {});
     
-    // 2. Start the AI chat with a new message
+    // Start the AI chat
     try {
         const reply = await generateTextReply(session.role, session.language, "Hi baby", isPremiumUser(userId), "", session.personaName);
         return ctx.reply(`*${session.personaName}*:\n\n${reply}`, { parse_mode: 'Markdown' });
