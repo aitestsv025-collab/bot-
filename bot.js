@@ -1,5 +1,5 @@
 
-import { Telegraf } from 'telegraf';
+import { Telegraf, Markup } from 'telegraf';
 import { CONFIG } from './config.js';
 import { userSessions, globalStats, isPremiumUser } from './state.js';
 import { getPersistentMarkup, getLanguageKeyboard } from './utils/markups.js';
@@ -33,6 +33,8 @@ if (bot) {
     bot.start(async (ctx) => {
         try {
             const userId = ctx.chat.id;
+            const isPremium = isPremiumUser(userId);
+
             if (!userSessions.has(userId)) {
                 globalStats.totalUsers++;
                 userSessions.set(userId, { 
@@ -41,9 +43,31 @@ if (bot) {
                     language: 'Hinglish',
                     role: 'Romantic',
                     messageCount: 0,
-                    imageCount: 0
+                    normalImageCount: 0,
+                    boldImageCount: 0
                 });
             }
+
+            // PIN PREMIUM BANNER FOR FREE USERS
+            if (!isPremium) {
+                const premiumBanner = await ctx.reply(
+                    "👑 <b>SOULMATE PREMIUM ACCESS</b> 👑\n\n" +
+                    "• 🫦 Unlimited Bold/NSFW Photos\n" +
+                    "• 🔥 Unlimited AI Chats (No Daily Limit)\n" +
+                    "• 💍 All Secret Roles Unlocked\n\n" +
+                    "<i>Niche button daba kar upgrade karein aur maza double karein!</i> 🤤",
+                    {
+                        parse_mode: 'HTML',
+                        ...Markup.inlineKeyboard([[Markup.button.callback('💎 GET PREMIUM ACCESS 💎', 'show_rates')]])
+                    }
+                );
+                try {
+                    await ctx.pinChatMessage(premiumBanner.message_id);
+                } catch (pinErr) {
+                    console.log("Pin permission missing or fail:", pinErr.message);
+                }
+            }
+
             return ctx.reply(
                 `Hey ${ctx.from.first_name}! ❤️\n\nMain ${CONFIG.BOT_NAME}... tumhari digital SoulMate. 🫦\n\nKaunsi language mein baat karoge baby?`,
                 getPersistentMarkup(userId, getLanguageKeyboard())

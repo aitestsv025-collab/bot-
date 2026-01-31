@@ -60,11 +60,25 @@ export function incrementMessageCount(userId) {
     return 0;
 }
 
-export function incrementImageCount(userId) {
+export function incrementNormalImageCount(userId) {
     const session = userSessions.get(userId);
     if (session) {
-        session.imageCount = (session.imageCount || 0) + 1;
-        return session.imageCount;
+        session.normalImageCount = (session.normalImageCount || 0) + 1;
+        return session.normalImageCount;
     }
     return 0;
+}
+
+export function incrementBoldImageCount(userId) {
+    const session = userSessions.get(userId);
+    if (session) {
+        session.boldImageCount = (session.boldImageCount || 0) + 1;
+        return session.boldImageCount;
+    }
+    return 0;
+}
+
+// Legacy function keeping for compatibility
+export function incrementImageCount(userId) {
+    return incrementNormalImageCount(userId);
 }

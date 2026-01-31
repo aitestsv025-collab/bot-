@@ -19,6 +19,8 @@ export const CONFIG = {
     // Defaulting strictly to PROD for real payments
     CASHFREE_MODE: (process.env.CASHFREE_MODE || "PROD").toUpperCase().trim(),
     FREE_MESSAGE_LIMIT: 50,
+    FREE_AI_IMAGE_LIMIT: 5,
+    FREE_BOLD_IMAGE_LIMIT: 3,
     BOT_NAME: "Malini",
     // Ensure host doesn't have trailing slash
     HOST: (process.env.RENDER_EXTERNAL_URL || `https://${process.env.RENDER_EXTERNAL_HOSTNAME}` || 'http://localhost:10000').replace(/\/$/, '')

@@ -4,13 +4,15 @@ import { LANGUAGES } from '../constants/languages.js';
 import { ROLES } from '../constants/roles.js';
 import { isPremiumUser } from '../state.js';
 
+/**
+ * Ab ye sirf wahi buttons return karega jo explicitly bheje jayenge.
+ * Premium button yahan se nikaal di gayi hai kyunki wo ab PIN rahegi.
+ */
 export const getPersistentMarkup = (userId, extraButtons = []) => {
-    const buttons = [];
-    if (!isPremiumUser(userId)) {
-        buttons.push([Markup.button.callback('👑 UNLOCK PREMIUM (NSFW + Unlimited) 👑', 'show_rates')]);
+    if (extraButtons.length > 0) {
+        return Markup.inlineKeyboard(extraButtons);
     }
-    if (extraButtons.length > 0) buttons.push(...extraButtons);
-    return Markup.inlineKeyboard(buttons);
+    return undefined; // No extra buttons needed for normal chat
 };
 
 export const getLanguageKeyboard = () => {
