@@ -1,7 +1,6 @@
 
-import { userSessions, isPremiumUser } from '../state.js';
-import { getRoleKeyboard } from '../utils/markups.js';
-import { Markup } from 'telegraf';
+import { userSessions, isPremiumUser, getRandomName } from '../state.js';
+import { generateTextReply } from '../services/aiText.js';
 import { CONFIG } from '../config.js';
 
 export async function handleLanguageSelection(ctx) {
@@ -17,13 +16,16 @@ export async function handleLanguageSelection(ctx) {
 
     const lang = ctx.match[1];
     session.language = lang;
+    session.personaName = getRandomName();
 
-    // EDIT the current message to show Roles instead of sending a new one
-    return ctx.editMessageText(
-        `✅ Language: <b>${lang}</b>\n\nAb batao main aaj tumhare liye kya banoon? 🫦`,
-        {
-            parse_mode: 'HTML',
-            ...Markup.inlineKeyboard(getRoleKeyboard(ctx.chat.id))
-        }
-    ).catch(e => console.error("Edit Lang Error:", e));
+    // 1. Edit current message to say it's ready (removes buttons)
+    await ctx.editMessageText(`✅ <b>Taiyar Hoon!</b>\nMain <b>${session.personaName}</b> ban gayi hoon. 🫦\n\nAb maza shuru karte hain...`, { parse_mode: 'HTML' }).catch(() => {});
+    
+    // 2. Start the AI chat with a new message
+    try {
+        const reply = await generateTextReply(session.role, session.language, "Hi baby", isPremiumUser(userId), "", session.personaName);
+        return ctx.reply(`*${session.personaName}*:\n\n${reply}`, { parse_mode: 'Markdown' });
+    } catch (err) {
+        return ctx.reply(`Hey baby! ❤️ Main ready hoon.`);
+    }
 }

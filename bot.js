@@ -2,7 +2,7 @@
 import { Telegraf, Markup } from 'telegraf';
 import { CONFIG } from './config.js';
 import { userSessions, globalStats, isPremiumUser } from './state.js';
-import { getLanguageKeyboard } from './utils/markups.js';
+import { getRoleKeyboard } from './utils/markups.js';
 import { handleLanguageSelection } from './handlers/languageAction.js';
 import { handleRoleSelection } from './handlers/roleAction.js';
 import { handleShowRates, handlePaymentTrigger } from './handlers/premiumAction.js';
@@ -66,10 +66,10 @@ if (bot) {
                 try { await ctx.pinChatMessage(banner.message_id); } catch (e) {}
             }
 
-            // Only show Language selection to keep it clean
+            // SHOW ROLES FIRST
             return ctx.reply(
-                `Hey ${ctx.from.first_name}! ❤️ Kaunsi language mein baat karoge?`,
-                Markup.inlineKeyboard(getLanguageKeyboard())
+                `Hey ${ctx.from.first_name}! ❤️ Main aaj tumhare liye kya banoon? 🫦`,
+                Markup.inlineKeyboard(getRoleKeyboard(ctx.chat.id))
             );
         } catch (e) { console.error(e); }
     });

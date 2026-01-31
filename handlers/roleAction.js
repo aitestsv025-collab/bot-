@@ -1,8 +1,9 @@
 
-import { userSessions, isPremiumUser, getRandomName } from '../state.js';
-import { generateTextReply } from '../services/aiText.js';
+import { userSessions, isPremiumUser } from '../state.js';
 import { ROLES } from '../constants/roles.js';
 import { CONFIG } from '../config.js';
+import { Markup } from 'telegraf';
+import { getLanguageKeyboard } from '../utils/markups.js';
 
 export async function handleRoleSelection(ctx) {
     try { await ctx.answerCbQuery().catch(() => {}); } catch(e) {}
@@ -20,19 +21,24 @@ export async function handleRoleSelection(ctx) {
         return ctx.reply("❌ Ye Role Premium hai baby! Join karo na?");
     }
 
-    session.personaName = getRandomName();
     session.role = roleId;
 
-    const roleLabel = [...ROLES.FREE, ...ROLES.PREMIUM].find(r => r.id === roleId)?.label || roleId;
-
-    // 1. Edit current message to say it's ready (removes buttons)
-    await ctx.editMessageText(`✅ <b>Ready!</b>\nMain <b>${session.personaName}</b> (${roleLabel}) ban gayi hoon. ❤️`, { parse_mode: 'HTML' }).catch(() => {});
-    
-    // 2. Start the AI chat with a new message
-    try {
-        const reply = await generateTextReply(roleId, session.language, "Hi baby", isPremiumUser(userId), "", session.personaName);
-        return ctx.reply(`*${session.personaName}*:\n\n${reply}`, { parse_mode: 'Markdown' });
-    } catch (err) {
-        return ctx.reply(`Hey baby! ❤️ Main ready hoon.`);
+    if (roleId === 'Custom') {
+        await ctx.editMessageText("💍 <b>Custom Persona Mode Active</b>", { parse_mode: 'HTML' }).catch(() => {});
+        session.awaitingCustomRole = true;
+        session.customRoleStep = 'NAME';
+        return ctx.reply(`Main wahi banungi jo tum bologe baby...\n\nPehle batao main aaj kya banoon? (Example: 'Pados wali bhabhi')`, { parse_mode: 'Markdown' });
     }
+
+    const allRoles = [...ROLES.FREE, ...ROLES.PREMIUM];
+    const roleLabel = allRoles.find(r => r.id === roleId)?.label.split(' (')[0] || roleId;
+
+    // After Role selection, ask for Language using Role-specific text
+    return ctx.editMessageText(
+        `✅ Role Set: <b>${roleLabel}</b>\n\nSelect your <b>${roleLabel}</b> language baby... ❤️`,
+        {
+            parse_mode: 'HTML',
+            ...Markup.inlineKeyboard(getLanguageKeyboard())
+        }
+    ).catch(e => console.error("Edit Role Error:", e));
 }
