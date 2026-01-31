@@ -7,10 +7,11 @@ interface UserData {
   isPremium: boolean;
 }
 
-interface LogEntry {
+interface ChatLog {
   time: string;
-  message: string;
-  type: 'info' | 'success' | 'error' | 'warning';
+  userName: string;
+  userMsg: string;
+  botReply: string;
 }
 
 interface StatsData {
@@ -18,16 +19,12 @@ interface StatsData {
   totalRevenue: number;
   totalMessagesProcessed: number;
   privatePhotosSent: number;
-  isCashfreeApproved: boolean;
-  lastRawError: any;
-  mode: string;
-  logs: LogEntry[];
+  chatHistory: ChatLog[];
   users: UserData[];
 }
 
 const StatsDashboard: React.FC = () => {
   const [stats, setStats] = useState<StatsData | null>(null);
-  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -37,141 +34,94 @@ const StatsDashboard: React.FC = () => {
       } catch (e) { console.error(e); }
     };
     fetchStats();
-    const timer = setInterval(fetchStats, 3000);
+    const timer = setInterval(fetchStats, 5000);
     return () => clearInterval(timer);
   }, []);
 
-  const verifyCashfree = async () => {
-    setChecking(true);
-    try {
-      const res = await fetch('/api/admin/verify-cashfree');
-      const data = await res.json();
-      if (data.active) {
-        alert("🎉 BADHAYI HO! Cashfree activate ho gaya hai!");
-      } else {
-        alert("Abhi bhi inactive hai baby. Error: " + data.error);
-      }
-    } catch (e) { alert("Check failed!"); }
-    setChecking(false);
-  };
-
-  const getLogColor = (type: string) => {
-    switch(type) {
-        case 'success': return 'text-green-400';
-        case 'error': return 'text-red-400';
-        case 'warning': return 'text-yellow-400';
-        default: return 'text-blue-400';
-    }
-  };
-
   return (
-    <div className="p-4 md:p-8 space-y-6 bg-slate-950 min-h-screen text-slate-200">
-      {/* GLOWING HEADER */}
-      <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] flex flex-col md:flex-row items-center justify-between shadow-2xl relative overflow-hidden group">
-        <div className="absolute inset-0 bg-gradient-to-r from-rose-500/10 to-transparent opacity-50"></div>
-        <div className="relative z-10">
-          <h2 className="font-black italic text-rose-500 text-3xl fancy-font tracking-tight">SoulMate Command Center</h2>
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-ping"></span> Live System Monitoring
-          </p>
+    <div className="p-4 md:p-8 space-y-8 bg-[#020617] min-h-screen text-slate-200">
+      
+      {/* HEADER SECTION: TOTAL SALES */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2 bg-gradient-to-br from-rose-600 to-rose-900 p-8 rounded-[3rem] shadow-2xl flex flex-col justify-center">
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-rose-200/60">Total Earnings</h2>
+                <span className="bg-white/10 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-white">Live Tracking</span>
+            </div>
+            <p className="text-6xl font-black text-white">₹{stats?.totalRevenue || 0}</p>
+            <p className="text-sm font-bold text-rose-200/80 mt-2 italic">Aapke bot ne itna maza aur paisa kamaya hai! 🫦🚀</p>
         </div>
-        <div className="relative z-10 flex gap-4 mt-4 md:mt-0">
-            <button 
-                onClick={verifyCashfree}
-                disabled={checking}
-                className={`px-6 py-2 rounded-2xl text-[10px] font-black uppercase transition-all flex items-center gap-2 ${checking ? 'bg-slate-800 text-slate-500' : 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-500/20 active:scale-95'}`}
-            >
-                <i className={`fas ${checking ? 'fa-spinner fa-spin' : 'fa-sync-alt'}`}></i> 
-                {checking ? 'Checking...' : 'Verify Cashfree'}
-            </button>
-            <div className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-2xl text-[10px] font-black uppercase text-slate-400 flex items-center gap-2">
-                MODE: <span className="text-rose-400">{stats?.mode || 'PROD'}</span>
+
+        <div className="space-y-4">
+            <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-[2.5rem] flex items-center justify-between">
+                <div>
+                    <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Active Lovers</p>
+                    <p className="text-2xl font-black text-white">{stats?.totalUsers || 0}</p>
+                </div>
+                <div className="w-10 h-10 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500">
+                    <i className="fas fa-users"></i>
+                </div>
+            </div>
+            <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-[2.5rem] flex items-center justify-between">
+                <div>
+                    <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Photos Sent</p>
+                    <p className="text-2xl font-black text-white">{stats?.privatePhotosSent || 0}</p>
+                </div>
+                <div className="w-10 h-10 bg-purple-500/10 rounded-2xl flex items-center justify-center text-purple-500">
+                    <i className="fas fa-camera"></i>
+                </div>
             </div>
         </div>
       </div>
 
-      {/* TOP CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Revenue', val: `₹${stats?.totalRevenue || 0}`, icon: 'fa-indian-rupee-sign', color: 'rose' },
-          { label: 'Lovers', val: stats?.totalUsers || 0, icon: 'fa-users', color: 'blue' },
-          { label: 'Moments', val: stats?.privatePhotosSent || 0, icon: 'fa-camera', color: 'orange' },
-          { label: 'Messages', val: stats?.totalMessagesProcessed || 0, icon: 'fa-comment-dots', color: 'purple' }
-        ].map((card, idx) => (
-          <div key={idx} className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] transition-all hover:border-rose-500/50">
-            <div className="flex justify-between items-start mb-4">
-               <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{card.label}</p>
-               <i className={`fas ${card.icon} text-${card.color}-500/50`}></i>
-            </div>
-            <p className="text-3xl font-black text-white">{card.val}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* LOG TERMINAL */}
-        <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-[2.5rem] flex flex-col h-[500px]">
-            <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">Live Logs</h3>
-                <span className="text-[9px] bg-slate-800 px-2 py-1 rounded text-slate-500 font-mono">STDOUT</span>
-            </div>
-            <div className="flex-1 overflow-y-auto p-6 font-mono text-[11px] space-y-2 scrollbar-thin scrollbar-thumb-slate-700">
-                {stats?.logs && stats.logs.length > 0 ? (
-                    stats.logs.map((log, i) => (
-                        <div key={i} className="flex gap-3 border-l border-slate-800 pl-3">
-                            <span className="text-slate-600 shrink-0">[{log.time}]</span>
-                            <span className={getLogColor(log.type)}>{log.message}</span>
-                        </div>
-                    ))
-                ) : (
-                    <p className="text-slate-700 italic">Waiting for activity...</p>
-                )}
-            </div>
+      {/* CONVERSATION FEED */}
+      <div className="bg-slate-900/40 border border-slate-800 rounded-[3rem] overflow-hidden">
+        <div className="px-8 py-6 bg-slate-950 border-b border-slate-800 flex justify-between items-center">
+            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">User Conversation Log</h3>
+            <span className="text-[10px] font-bold text-slate-600">Live Feed</span>
         </div>
-
-        {/* FEED & ERRORS */}
-        <div className="lg:col-span-2 space-y-6">
-            {/* CASHFREE ALERT */}
-            {stats && !stats.isCashfreeApproved && (
-                <div className="bg-red-500/10 border-2 border-red-500/20 p-6 rounded-[2.5rem] flex items-center gap-6 animate-pulse">
-                    <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center text-white text-xl shrink-0 shadow-lg shadow-red-500/20">
-                        <i className="fas fa-exclamation-circle"></i>
-                    </div>
-                    <div>
-                        <h4 className="font-black text-red-400 text-lg uppercase tracking-tight">Wait for Support Approval</h4>
-                        <p className="text-red-300/70 text-xs">Cashfree support ne aapka ticket le liya hai. Unhe 12-24 ghante lagte hain feature enable karne mein. Tab tak "Verify" button se check karte rahein.</p>
-                    </div>
-                </div>
-            )}
-
-            {/* USER LIST */}
-            <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] overflow-hidden">
-                <div className="p-6 border-b border-slate-800">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">Recent Lovers</h3>
-                </div>
-                <div className="max-h-[300px] overflow-y-auto">
-                    <table className="w-full text-left">
-                        <thead className="bg-slate-950 text-[9px] font-black uppercase text-slate-500">
-                            <tr>
-                                <th className="px-8 py-4">Name</th>
-                                <th className="px-8 py-4">Status</th>
+        <div className="max-h-[600px] overflow-y-auto scrollbar-hide">
+            <table className="w-full text-left border-collapse">
+                <thead className="bg-slate-950 text-slate-500 text-[9px] font-black uppercase tracking-widest sticky top-0">
+                    <tr>
+                        <th className="px-8 py-4">Time</th>
+                        <th className="px-8 py-4">User</th>
+                        <th className="px-8 py-4">Message</th>
+                        <th className="px-8 py-4">Bot Reply / Media</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50">
+                    {stats?.chatHistory && stats.chatHistory.length > 0 ? (
+                        stats.chatHistory.map((chat, idx) => (
+                            <tr key={idx} className="hover:bg-white/[0.02] transition-colors group">
+                                <td className="px-8 py-5 text-[10px] font-mono text-slate-500">{chat.time}</td>
+                                <td className="px-8 py-5 text-[11px] font-black text-rose-400">{chat.userName}</td>
+                                <td className="px-8 py-5 text-sm text-slate-300 max-w-xs truncate group-hover:whitespace-normal">
+                                    {chat.userMsg}
+                                </td>
+                                <td className="px-8 py-5 text-sm text-slate-400">
+                                    {chat.botReply.startsWith('[SENT_IMAGE]:') ? (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-purple-400 font-black text-[9px] bg-purple-400/10 px-2 py-1 rounded border border-purple-400/20">📸 MEDIA SENT</span>
+                                            <a href={chat.botReply.split(': ')[1]} target="_blank" rel="noreferrer" className="text-[10px] text-blue-400 underline hover:text-blue-300 truncate max-w-[150px]">
+                                                {chat.botReply.split(': ')[1]}
+                                            </a>
+                                        </div>
+                                    ) : (
+                                        <span className="italic">{chat.botReply}</span>
+                                    )}
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800">
-                            {stats?.users.map(u => (
-                                <tr key={u.id} className="hover:bg-slate-800/30 transition-colors">
-                                    <td className="px-8 py-5 text-sm font-bold">{u.userName}</td>
-                                    <td className="px-8 py-5">
-                                        <span className={`text-[9px] px-3 py-1 rounded-full font-black uppercase ${u.isPremium ? 'bg-green-500/20 text-green-400' : 'bg-slate-800 text-slate-500'}`}>
-                                            {u.isPremium ? 'Premium' : 'Free'}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                        ))
+                    ) : (
+                        <tr>
+                            <td colSpan={4} className="px-8 py-20 text-center text-slate-600 italic text-sm">
+                                Waiting for interactions... ❤️
+                            </td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
         </div>
       </div>
     </div>

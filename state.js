@@ -11,7 +11,8 @@ export const globalStats = {
     lastPaymentError: null, 
     lastRawError: null,
     isCashfreeApproved: true,
-    logs: [] // Real-time activity logs
+    logs: [], // System activity logs
+    chatHistory: [] // User-Bot conversation logs
 };
 
 export function addLog(message, type = 'info') {
@@ -22,6 +23,18 @@ export function addLog(message, type = 'info') {
     };
     globalStats.logs.unshift(log);
     if (globalStats.logs.length > 50) globalStats.logs.pop();
+}
+
+export function addChatLog(userId, userName, userMsg, botReply) {
+    const chat = {
+        time: new Date().toLocaleTimeString(),
+        userId,
+        userName,
+        userMsg,
+        botReply
+    };
+    globalStats.chatHistory.unshift(chat);
+    if (globalStats.chatHistory.length > 100) globalStats.chatHistory.pop();
 }
 
 const NAMES = [
