@@ -31,13 +31,19 @@ export async function handleRoleSelection(ctx) {
     }
 
     const allRoles = [...ROLES.FREE, ...ROLES.PREMIUM];
-    // Strip emojis and age for cleaner role name in instruction
-    let roleLabel = allRoles.find(r => r.id === roleId)?.label || roleId;
-    roleLabel = roleLabel.replace(/[^\w\s]/gi, '').split('(')[0].trim();
+    const roleObj = allRoles.find(r => r.id === roleId);
+    let rawLabel = roleObj?.label || roleId;
 
-    // STEP 2: SHOW LANGUAGE with exact requested format
+    /**
+     * LOGIC: 
+     * 1. Pehle '(' se split karo taaki '(18)' wala part nikal jaye.
+     * 2. Phir emojis remove karne ke liye replace use karo.
+     */
+    const cleanRoleName = rawLabel.split('(')[0].replace(/[^\w\s]/gi, '').trim();
+
+    // STEP 2: SHOW LANGUAGE - Age and emoji removed from prompt
     return ctx.editMessageText(
-        `Select your <b>${roleLabel}</b> language baby... ❤️`,
+        `Select your <b>${cleanRoleName}</b> language baby... ❤️`,
         {
             parse_mode: 'HTML',
             ...Markup.inlineKeyboard(getLanguageKeyboard())

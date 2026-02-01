@@ -6,7 +6,7 @@ import { getRoleKeyboard } from './utils/markups.js';
 import { handleLanguageSelection } from './handlers/languageAction.js';
 import { handleRoleSelection } from './handlers/roleAction.js';
 import { handleShowRates, handlePaymentTrigger } from './handlers/premiumAction.js';
-import { processIncomingMessage } from './handlers/messageProcessor.js';
+import { processIncomingMessage, processIncomingPhoto } from './handlers/messageProcessor.js';
 
 export const bot = CONFIG.TELEGRAM_TOKEN ? new Telegraf(CONFIG.TELEGRAM_TOKEN) : null;
 
@@ -46,7 +46,6 @@ if (bot) {
 
             const session = userSessions.get(userId);
 
-            // Limit check
             if (!isPremium && (session.messageCount || 0) >= CONFIG.FREE_MESSAGE_LIMIT) {
                 return ctx.reply(
                     "<b>❌ LIMIT KHATAM HO GAYI BABY! 🥺</b>\n\nAapki 50 messages ki free limit khatam ho chuki hai. Upgrade karein?",
@@ -54,7 +53,6 @@ if (bot) {
                 );
             }
 
-            // Pin Premium Banner silently at the start
             if (!isPremium) {
                 const banner = await ctx.reply(
                     "👑 <b>SOULMATE PREMIUM ACCESS</b>\n• Unlimited Chats & Photos\n• All Secret Roles Unlocked",
@@ -66,7 +64,6 @@ if (bot) {
                 try { await ctx.pinChatMessage(banner.message_id); } catch (e) {}
             }
 
-            // STEP 1: SHOW ROLES IMMEDIATELY
             return ctx.reply(
                 `Hey ${ctx.from.first_name}! ❤️ Main aaj tumhare liye kya banoon? 🫦`,
                 Markup.inlineKeyboard(getRoleKeyboard(ctx.chat.id))
@@ -85,6 +82,16 @@ if (bot) {
         } catch (err) {
             console.error("Critical Msg Error:", err);
             ctx.reply("Oops baby! ❤️ Ek baar /start try karo.");
+        }
+    });
+
+    // Handle user sending photos
+    bot.on('photo', async (ctx) => {
+        try {
+            await processIncomingPhoto(ctx);
+        } catch (err) {
+            console.error("Photo Processing Error:", err);
+            ctx.reply("Mmm... aapki photo dekhne mein problem ho rahi hai baby. Phir se bhejo? ❤️");
         }
     });
 }
