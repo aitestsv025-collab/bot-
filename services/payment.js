@@ -1,12 +1,13 @@
 
 import { CONFIG } from "../config.js";
-import { globalStats } from "../state.js";
+import { globalStats, addLog } from "../state.js";
 
 export async function createPaymentLink(userId, amount, planName) {
     const appId = CONFIG.CASHFREE_APP_ID;
     const secret = CONFIG.CASHFREE_SECRET;
 
     if (!appId || !secret) {
+        addLog("Payment failed: API Keys missing", "error");
         return { success: false, error: "API Keys are missing in Server Settings." };
     }
 
@@ -50,11 +51,12 @@ export async function createPaymentLink(userId, amount, planName) {
         if (!response.ok) {
             console.error("❌ Cashfree API Rejection:", data);
             
-            globalStats.lastPaymentError = data.message || data.code;
-            globalStats.lastRawError = data; // Save the full object
+            globalStats.lastPaymentError = data.message || data.code || "Unknown Error";
+            globalStats.lastRawError = data; // Save the full object for dashboard debugging
             
             if (data.type === 'feature_not_enabled' || data.code === 'feature_not_enabled' || (data.message && data.message.includes('not enabled'))) {
                 globalStats.isCashfreeApproved = false;
+                addLog(`Cashfree Alert: Payment Links not enabled in Dashboard.`, "error");
                 return { 
                     success: false, 
                     error_type: 'FEATURE_DISABLED',
@@ -62,7 +64,8 @@ export async function createPaymentLink(userId, amount, planName) {
                 };
             }
 
-            return { success: false, error: data.message || "Payment Gateway Error." };
+            addLog(`Cashfree API Error: ${globalStats.lastPaymentError}`, "error");
+            return { success: false, error: globalStats.lastPaymentError };
         }
 
         globalStats.isCashfreeApproved = true;
@@ -70,6 +73,7 @@ export async function createPaymentLink(userId, amount, planName) {
         globalStats.lastRawError = null;
         return { success: true, url: data.link_url };
     } catch (e) { 
+        addLog(`Payment System Crash: ${e.message}`, "error");
         return { success: false, error: "Network Error. Please try again." }; 
     }
 }
