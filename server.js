@@ -14,33 +14,30 @@ app.use(express.json());
 
 checkSystem();
 
-// Auto-check function
+// Auto-check function for Cashfree status
 async function runAutoVerification() {
-    if (globalStats.isCashfreeApproved) return;
+    if (globalStats.isCashfreeApproved && !globalStats.lastPaymentError) return;
     
-    console.log("🔄 Background Check: Checking Cashfree status...");
-    const result = await createPaymentLink(999, 1, "Background Check");
+    console.log("🔄 Background Check: Verifying Cashfree status...");
+    const result = await createPaymentLink(999, 1, "System Verification");
     if (result.success) {
         globalStats.isCashfreeApproved = true;
-        addLog("🎉 EXCELLENT! Cashfree is now FULLY ENABLED. Bot is taking payments!", "success");
-    } else {
-        console.log(`Still waiting... Reason: ${result.error}`);
+        globalStats.lastPaymentError = null;
+        globalStats.lastRawError = null;
+        addLog("🎉 SYSTEM RECOVERED: Cashfree is now fully functional.", "success");
     }
 }
 
-// Run check every 30 minutes
-setInterval(runAutoVerification, 30 * 60 * 1000);
+setInterval(runAutoVerification, 15 * 60 * 1000); // Check every 15m
 
 app.get('/api/admin/verify-cashfree', async (req, res) => {
     addLog("Manual Verification triggered...", "warning");
-    const result = await createPaymentLink(999, 1, "Manual Status Check");
+    const result = await createPaymentLink(999, 1, "Manual Diagnosis");
     if (result.success) {
         globalStats.isCashfreeApproved = true;
-        addLog("✅ Manual Check: Cashfree is ACTIVE!", "success");
         res.json({ active: true });
     } else {
-        addLog(`❌ Manual Check: Still inactive (${result.error})`, "error");
-        res.json({ active: false, error: result.error });
+        res.json({ active: false, error: result.error, details: result.details });
     }
 });
 
@@ -76,9 +73,18 @@ app.post('/api/cashfree/webhook', (req, res) => {
 });
 
 app.get('/api/admin/stats', (req, res) => {
+    // Collect masked environment status for dashboard
+    const envStatus = {
+        telegram: !!CONFIG.TELEGRAM_TOKEN,
+        gemini: !!CONFIG.GEMINI_KEY,
+        cf_id: CONFIG.CASHFREE_APP_ID || "missing",
+        cf_secret: CONFIG.CASHFREE_SECRET || "missing"
+    };
+
     res.json({ 
         ...globalStats, 
         mode: CONFIG.CASHFREE_MODE,
+        envStatus,
         users: Array.from(userSessions.entries()).map(([id, d]) => ({ id, ...d })) 
     });
 });

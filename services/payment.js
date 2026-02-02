@@ -7,8 +7,10 @@ export async function createPaymentLink(userId, amount, planName) {
     const secret = CONFIG.CASHFREE_SECRET;
 
     if (!appId || !secret) {
-        addLog("Payment failed: API Keys missing", "error");
-        return { success: false, error: "API Keys are missing in Server Settings." };
+        const err = "API Credentials (App ID or Secret) are MISSING in environment variables.";
+        globalStats.lastPaymentError = err;
+        addLog(err, "error");
+        return { success: false, error: err };
     }
 
     const isProd = CONFIG.CASHFREE_MODE === "PROD";
@@ -35,6 +37,8 @@ export async function createPaymentLink(userId, amount, planName) {
             }
         };
 
+        addLog(`Creating payment link for ${userId} (${CONFIG.CASHFREE_MODE} mode)...`, "info");
+
         const response = await fetch(baseUrl, {
             method: 'POST',
             headers: {
@@ -51,29 +55,31 @@ export async function createPaymentLink(userId, amount, planName) {
         if (!response.ok) {
             console.error("❌ Cashfree API Rejection:", data);
             
-            globalStats.lastPaymentError = data.message || data.code || "Unknown Error";
-            globalStats.lastRawError = data; // Save the full object for dashboard debugging
+            globalStats.lastPaymentError = data.message || data.code || "Unknown Gateway Error";
+            globalStats.lastRawError = {
+                status: response.status,
+                url: baseUrl,
+                response: data,
+                mode: CONFIG.CASHFREE_MODE
+            };
             
-            if (data.type === 'feature_not_enabled' || data.code === 'feature_not_enabled' || (data.message && data.message.includes('not enabled'))) {
-                globalStats.isCashfreeApproved = false;
-                addLog(`Cashfree Alert: Payment Links not enabled in Dashboard.`, "error");
-                return { 
-                    success: false, 
-                    error_type: 'FEATURE_DISABLED',
-                    error: data.message || "Feature not enabled."
-                };
-            }
-
-            addLog(`Cashfree API Error: ${globalStats.lastPaymentError}`, "error");
-            return { success: false, error: globalStats.lastPaymentError };
+            addLog(`Cashfree API Error [${response.status}]: ${globalStats.lastPaymentError}`, "error");
+            
+            return { 
+                success: false, 
+                error: globalStats.lastPaymentError,
+                details: data
+            };
         }
 
         globalStats.isCashfreeApproved = true;
         globalStats.lastPaymentError = null;
         globalStats.lastRawError = null;
+        addLog(`Payment link created successfully: ${data.link_url}`, "success");
         return { success: true, url: data.link_url };
     } catch (e) { 
-        addLog(`Payment System Crash: ${e.message}`, "error");
-        return { success: false, error: "Network Error. Please try again." }; 
+        globalStats.lastPaymentError = `Network/System Error: ${e.message}`;
+        addLog(globalStats.lastPaymentError, "error");
+        return { success: false, error: e.message }; 
     }
 }
