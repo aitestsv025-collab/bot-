@@ -1,6 +1,7 @@
 
 import { Markup } from 'telegraf';
 import { createPaymentLink } from '../services/payment.js';
+import { CONFIG } from '../config.js';
 
 export function handleShowRates(ctx) {
     try { ctx.answerCbQuery().catch(() => {}); } catch(e) {}
@@ -47,25 +48,20 @@ export async function handlePaymentTrigger(ctx) {
                 }
             );
         } else {
-            let errorMsg = `<b>❌ Payment Issue!</b>\n\n<code>${result.error}</code>\n\n`;
-            
-            if (result.error_type === 'FEATURE_DISABLED') {
-                errorMsg += "⚠️ <b>ACTION REQUIRED:</b> Aapke Cashfree account mein 'Payment Links' feature abhi disabled hai. Cashfree Dashboard > Activation mein jaakar use enable karein.";
-            }
+            // FALLBACK: If Cashfree fails, show UPI manual instructions
+            console.log("Payment Link Failed, showing UPI Fallback...");
+            await ctx.telegram.deleteMessage(userId, statusMsg.message_id).catch(() => {});
 
-            return ctx.telegram.editMessageText(
-                userId,
-                statusMsg.message_id,
-                null,
-                errorMsg,
-                { 
+            return ctx.reply(
+                `<b>🥺 OOPS! Link Generator Busy Hai...</b>\n\nPar fikar mat karo baby! Aap directly is UPI ID par <b>₹${amount}</b> pay kar do:\n\n<code>${CONFIG.UPI_ID}</code>\n\nPayment karne ke baad uska <b>Screenshot</b> yahan bhejo. Main check karke aapko Premium access de dungi! 🫦✨`,
+                {
                     parse_mode: 'HTML',
                     ...Markup.inlineKeyboard([
-                        [Markup.button.url('Dashboard Check Karo', 'https://merchant.cashfree.com/merchant/pg')],
-                        [Markup.button.callback('Retry', 'show_rates')]
+                        [Markup.button.callback('Retry Link', 'pay_' + amount)],
+                        [Markup.button.callback('⬅️ Back', 'show_rates')]
                     ])
                 }
-            ).catch(e => console.error(e));
+            );
         }
     } catch (err) {
         return ctx.reply("Technical issue Jaanu... 🥺 Link nahi ban pa raha.");

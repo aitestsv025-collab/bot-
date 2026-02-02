@@ -19,6 +19,7 @@ export const CONFIG = {
     CASHFREE_APP_ID: getEnv(['CASHFREE_APP_ID']),
     CASHFREE_SECRET: getEnv(['CASHFREE_SECRET']),
     CASHFREE_MODE: (process.env.CASHFREE_MODE || "PROD").toUpperCase().trim(),
+    UPI_ID: getEnv(['UPI_ID'], 'your_upi_id@okicici'), // Fallback UPI for manual payments
     FREE_MESSAGE_LIMIT: 50,
     FREE_AI_IMAGE_LIMIT: 5,
     FREE_BOLD_IMAGE_LIMIT: 3,
@@ -31,8 +32,8 @@ export function checkSystem() {
     console.log("🚀 PRODUCTION SYSTEM STARTUP");
     console.log(`- Bot Name: ${CONFIG.BOT_NAME}`);
     console.log(`- Mode: ${CONFIG.CASHFREE_MODE}`);
+    console.log(`- UPI Fallback: ${CONFIG.UPI_ID}`);
     console.log(`- Telegram: ${CONFIG.TELEGRAM_TOKEN ? '✅ READY' : '❌ MISSING'}`);
     console.log(`- Gemini AI: ${CONFIG.GEMINI_KEY ? '✅ READY' : '❌ MISSING'}`);
-    console.log(`- Cashfree ID: ${CONFIG.CASHFREE_APP_ID ? '✅ READY' : '❌ MISSING'}`);
     console.log("=========================================");
 }
