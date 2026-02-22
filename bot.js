@@ -9,6 +9,11 @@ import { handleShowRates, handlePaymentTrigger } from './handlers/premiumAction.
 import { processIncomingMessage, processIncomingPhoto } from './handlers/messageProcessor.js';
 
 export const bot = CONFIG.TELEGRAM_TOKEN ? new Telegraf(CONFIG.TELEGRAM_TOKEN) : null;
+if (bot) {
+    console.log("✅ Telegraf Bot instance created.");
+} else {
+    console.error("❌ Failed to create Telegraf Bot instance: TELEGRAM_TOKEN is missing.");
+}
 
 if (bot) {
     bot.command('status', (ctx) => {
@@ -77,6 +82,7 @@ if (bot) {
     bot.action(/pay_(.+)/, handlePaymentTrigger);
 
     bot.on('text', async (ctx) => {
+        console.log(`📩 Message from ${ctx.from.first_name} (${ctx.from.id}): ${ctx.message.text}`);
         try {
             await processIncomingMessage(ctx);
         } catch (err) {

@@ -14,21 +14,24 @@ app.use(express.json());
 
 checkSystem();
 
-// Auto-check function for Cashfree status
-async function runAutoVerification() {
-    if (globalStats.isCashfreeApproved && !globalStats.lastPaymentError) return;
+// Endpoint to manually make a user premium from dashboard
+app.post('/api/admin/make-premium', (req, res) => {
+    const { userId } = req.body;
+    const session = userSessions.get(parseInt(userId));
     
-    console.log("🔄 Background Check: Verifying Cashfree status...");
-    const result = await createPaymentLink(999, 1, "System Verification");
-    if (result.success) {
-        globalStats.isCashfreeApproved = true;
-        globalStats.lastPaymentError = null;
-        globalStats.lastRawError = null;
-        addLog("🎉 SYSTEM RECOVERED: Cashfree is now fully functional.", "success");
+    if (session) {
+        session.isPremium = true;
+        session.expiry = Date.now() + (30 * 24 * 60 * 60 * 1000); // 30 days
+        addLog(`Manual Approval: User ${userId} is now Premium.`, "success");
+        
+        if (bot) {
+            bot.telegram.sendMessage(userId, "<b>🎉 CONGRATULATIONS BABY!</b>\n\nAapka payment approve ho gaya hai. Ab aap mere saare premium features aur bold photos access kar sakte ho! 🫦🔥", { parse_mode: 'HTML' })
+                .catch(e => console.log("Notify Error:", e.message));
+        }
+        return res.json({ success: true });
     }
-}
-
-setInterval(runAutoVerification, 15 * 60 * 1000); // Check every 15m
+    res.status(404).json({ success: false, error: "User not found" });
+});
 
 app.get('/api/admin/verify-cashfree', async (req, res) => {
     addLog("Manual Verification triggered...", "warning");
@@ -73,7 +76,6 @@ app.post('/api/cashfree/webhook', (req, res) => {
 });
 
 app.get('/api/admin/stats', (req, res) => {
-    // Collect masked environment status for dashboard
     const envStatus = {
         telegram: !!CONFIG.TELEGRAM_TOKEN,
         gemini: !!CONFIG.GEMINI_KEY,
@@ -85,20 +87,53 @@ app.get('/api/admin/stats', (req, res) => {
         ...globalStats, 
         mode: CONFIG.CASHFREE_MODE,
         envStatus,
-        users: Array.from(userSessions.entries()).map(([id, d]) => ({ id, ...d })) 
+        users: Array.from(userSessions.entries()).map(([id, d]) => ({ 
+            id, 
+            userName: d.userName,
+            isPremium: d.isPremium,
+            msgCount: d.messageCount,
+            lastSeen: new Date().toLocaleTimeString() // Simplified for demo
+        })) 
     });
 });
 
-app.use(express.static(path.join(__dirname, 'dist')));
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'dist', 'index.html')));
+// Vite middleware for development
+if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+    });
+    app.use(vite.middlewares);
+} else {
+    app.use(express.static(path.join(__dirname, 'dist')));
+}
 
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
-    console.log(`🚀 Server Running: ${CONFIG.HOST}`);
-    addLog(`Server started on ${CONFIG.HOST}`, "info");
+app.get('*', (req, res) => {
+    if (process.env.NODE_ENV !== "production") {
+        // In dev mode, Vite handles the index.html
+        res.status(404).send("Vite is handling this route");
+    } else {
+        res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    }
+});
+
+const PORT = 3000;
+app.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 Server Running on port ${PORT}`);
+    console.log(`🔗 Dashboard: ${CONFIG.HOST}`);
+    
     if (bot) {
+        console.log("🤖 Attempting to launch Telegram Bot...");
         bot.launch()
-            .then(() => addLog("🤖 Bot is Online", "success"))
-            .catch(err => addLog(`Bot Launch Failed: ${err.message}`, "error"));
+            .then(() => console.log("✅ Bot launched successfully!"))
+            .catch(err => {
+                console.error("❌ Bot Launch Failed:", err.message);
+                if (err.message.includes("401")) {
+                    console.error("👉 Hint: Your TELEGRAM_TOKEN might be invalid.");
+                }
+            });
+    } else {
+        console.warn("⚠️ Bot instance is null. Check if TELEGRAM_TOKEN is set in environment.");
     }
 });
